@@ -9,9 +9,10 @@ import { QuizView } from './components/QuizView';
 import { AchievementsView } from './components/AchievementsView';
 import { AuthView } from './components/AuthView';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
 // Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 const INITIAL_ACHIEVEMENTS: Achievement[] = [
   { id: 'first_upload', title: 'Quick Starter', description: 'Upload your first study document.', icon: 'Zap', unlocked: false, requirement: 1, currentValue: 0 },
