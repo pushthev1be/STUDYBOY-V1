@@ -22,6 +22,8 @@ export interface StudyMaterial {
   summary: string;
   flashcards: Flashcard[];
   quiz: QuizQuestion[];
+  unprocessedContent?: string;
+  contentCoveragePercent?: number;
 }
 
 export interface QuestionStatus {
@@ -69,3 +71,10 @@ export enum AppState {
 }
 
 export type ViewMode = 'summary' | 'flashcards' | 'quiz' | 'stats';
+
+export interface ProcessingState {
+  totalContent: string;
+  processedContent: string;
+  unprocessedContent: string;
+  fileName: string;
+}

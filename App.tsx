@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope } from 'lucide-react';
-import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User } from './types';
+import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState } from './types';
 import { processStudyContent, extendQuiz } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
@@ -60,6 +60,7 @@ const App: React.FC = () => {
   const [isExtending, setIsExtending] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [processedChars, setProcessedChars] = useState(0);
+  const [processingState, setProcessingState] = useState<ProcessingState | null>(null);
   
   const [stats, setStats] = useState<UserStats>(INITIAL_STATS);
   const [achievements, setAchievements] = useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
@@ -212,15 +213,33 @@ const App: React.FC = () => {
         throw new Error("Could not extract enough text from the document. Please ensure it contains readable text.");
       }
 
-      // Smart truncation for very large files
+      // Track content coverage: split when it exceeds limit
+      let unprocessedContent = '';
       if (content.length > MAX_CHAR_COUNT) {
+        unprocessedContent = content.substring(MAX_CHAR_COUNT);
         content = content.substring(0, MAX_CHAR_COUNT);
-        console.warn("Content truncated for performance.");
       }
 
       setProcessedChars(content.length);
+      
+      // Store processing state for later use
+      setProcessingState({
+        totalContent: content + unprocessedContent,
+        processedContent: content,
+        unprocessedContent,
+        fileName: file.name
+      });
+
       const result = await processStudyContent(content, isImage);
-      setMaterial(result);
+      const coveragePercent = unprocessedContent 
+        ? Math.round((content.length / (content.length + unprocessedContent.length)) * 100)
+        : 100;
+      
+      setMaterial({
+        ...result,
+        unprocessedContent,
+        contentCoveragePercent: coveragePercent
+      });
       setState(AppState.VIEWING);
       updateProgress('upload');
     } catch (error: any) {
@@ -232,19 +251,46 @@ const App: React.FC = () => {
 
   const handleKeepGoing = async () => {
     if (!material || isExtending) return;
-    setIsExtending(true);
-    try {
-      const newQuestions = await extendQuiz(material.title, material.quiz.length);
-      if (newQuestions.length > 0) {
+    
+    // If there's unprocessed content, generate from that
+    if (material.unprocessedContent) {
+      setIsExtending(true);
+      try {
+        const newMaterial = await processStudyContent(material.unprocessedContent, false);
         setMaterial({
           ...material,
-          quiz: [...material.quiz, ...newQuestions]
+          summary: material.summary + '\n\n[Continued from remaining content]\n' + newMaterial.summary,
+          flashcards: [...material.flashcards, ...newMaterial.flashcards],
+          quiz: [...material.quiz, ...newMaterial.quiz],
+          unprocessedContent: '', // Marked as fully processed
+          contentCoveragePercent: 100
         });
+        setShowNotification('Generated content from remaining material!');
+        setTimeout(() => setShowNotification(null), 5000);
+      } catch (err) {
+        console.error(err);
+        setErrorMessage("Failed to generate more content. Try again.");
+      } finally {
+        setIsExtending(false);
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsExtending(false);
+    } else {
+      // Fallback: generate more questions from existing material
+      setIsExtending(true);
+      try {
+        const newQuestions = await extendQuiz(material.title, material.quiz.length);
+        if (newQuestions.length > 0) {
+          setMaterial({
+            ...material,
+            quiz: [...material.quiz, ...newQuestions]
+          });
+          setShowNotification('Generated more practice questions!');
+          setTimeout(() => setShowNotification(null), 5000);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsExtending(false);
+      }
     }
   };
 
@@ -263,7 +309,7 @@ const App: React.FC = () => {
     if (!material) return null;
 
     switch (viewMode) {
-      case 'summary': return <SummaryView summary={material.summary} title={material.title} />;
+      case 'summary': return <SummaryView summary={material.summary} title={material.title} contentCoveragePercent={material.contentCoveragePercent} hasUnprocessedContent={!!material.unprocessedContent} />;
       case 'flashcards': return <FlashcardView cards={material.flashcards} onCardViewed={() => updateProgress('flashcard')} />;
       case 'quiz': return <QuizView 
           questions={material.quiz} 
