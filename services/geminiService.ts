@@ -154,3 +154,31 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
     return [];
   });
 }
+
+export async function generateQuestionForFailure(currentTopic: string): Promise<QuizQuestion[]> {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const model = 'gemini-3-flash-preview';
+
+  const prompt = `The student just got a question wrong about "${currentTopic}". 
+  Generate 2 NEW high-yield clinical vignettes to reinforce this concept. 
+  These should test similar pathophysiology, diagnostics, or management.
+  Return only the JSON array with 2 questions.`;
+
+  return retryWithBackoff(async () => {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
+        thinkingConfig: { thinkingBudget: 0 }
+      },
+    });
+
+    return JSON.parse(response.text || '[]') as QuizQuestion[];
+  }).catch(error => {
+    console.error("Generate Question for Failure Error:", error);
+    return [];
+  });
+}

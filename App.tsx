@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope } from 'lucide-react';
 import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState } from './types';
-import { processStudyContent, extendQuiz } from './services/geminiService';
+import { processStudyContent, extendQuiz, generateQuestionForFailure } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
 import { QuizView } from './components/QuizView';
@@ -294,6 +294,27 @@ const App: React.FC = () => {
     }
   };
 
+  const handleQuestionFailed = async () => {
+    if (!material || isExtending) return;
+    
+    setIsExtending(true);
+    try {
+      const newQuestions = await generateQuestionForFailure(material.title);
+      if (newQuestions.length > 0) {
+        setMaterial({
+          ...material,
+          quiz: [...material.quiz, ...newQuestions]
+        });
+        setShowNotification('💡 Generated 2 more questions to reinforce this concept!');
+        setTimeout(() => setShowNotification(null), 4000);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('sg_user');
     setUser(null);
@@ -315,6 +336,7 @@ const App: React.FC = () => {
           questions={material.quiz} 
           onQuizComplete={(score, total) => updateProgress('quiz', { perfect: score === total })} 
           onKeepGoing={handleKeepGoing}
+          onQuestionFailed={handleQuestionFailed}
           isExtending={isExtending}
         />;
       default: return null;

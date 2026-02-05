@@ -18,6 +18,7 @@ interface QuizViewProps {
   questions: QuizQuestion[];
   onQuizComplete?: (score: number, total: number) => void;
   onKeepGoing?: () => Promise<void>;
+  onQuestionFailed?: () => Promise<void>;
   isExtending?: boolean;
 }
 
@@ -25,6 +26,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   questions, 
   onQuizComplete, 
   onKeepGoing,
+  onQuestionFailed,
   isExtending = false 
 }) => {
   const [sessionStates, setSessionStates] = useState<QuestionStatus[]>([]);
@@ -59,14 +61,21 @@ export const QuizView: React.FC<QuizViewProps> = ({
     if (isSubmitted) return;
     
     const newStates = [...sessionStates];
+    const isCorrect = optionIndex === questions[qIdx].correctAnswer;
+    
     newStates[qIdx] = {
       ...newStates[qIdx],
       selectedOption: optionIndex,
       isAnswered: true,
-      isCorrect: optionIndex === questions[qIdx].correctAnswer,
+      isCorrect: isCorrect,
       showExplanation: true
     };
     setSessionStates(newStates);
+    
+    // Trigger auto-generate 2 more questions on failure
+    if (!isCorrect && onQuestionFailed) {
+      onQuestionFailed();
+    }
   };
 
   const toggleFlag = (qIdx: number) => {
