@@ -61,6 +61,42 @@ const SYSTEM_INSTRUCTION = `You are a Senior PA School Professor.
 3. KEY FOCUS: Diagnosis, Initial Test, Gold Standard, or First-line Management.
 4. CLINICAL PEARLS: Brief, high-yield takeaways only.`;
 
+// Retry logic with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelayMs: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if error is retryable (503, 429, or network errors)
+      const isRetryable = 
+        error?.status === 503 || 
+        error?.status === 429 || 
+        error?.message?.includes('overloaded') ||
+        error?.message?.includes('UNAVAILABLE');
+      
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw error;
+      }
+      
+      // Exponential backoff: 1s, 2s, 4s
+      const delayMs = initialDelayMs * Math.pow(2, attempt);
+      console.log(`Attempt ${attempt + 1} failed. Retrying in ${delayMs}ms...`);
+      
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  
+  throw lastError;
+}
+
 export async function processStudyContent(content: string, isImage: boolean = false): Promise<StudyMaterial> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   // Using gemini-3-flash-preview for maximum speed and responsiveness
@@ -70,7 +106,7 @@ export async function processStudyContent(content: string, isImage: boolean = fa
     ? `Analyze this clinical image. Create a PANCE-style study kit with 8 high-yield clinical vignette questions.`
     : `Based on these notes: \n\n${content}\n\nGenerate a PANCE-style study kit. 8 Clinical vignettes, summary, and flashcards. Focus on board-relevant info.`;
 
-  try {
+  return retryWithBackoff(async () => {
     const response = await ai.models.generateContent({
       model,
       contents: isImage 
@@ -85,10 +121,10 @@ export async function processStudyContent(content: string, isImage: boolean = fa
     });
 
     return JSON.parse(response.text || '{}') as StudyMaterial;
-  } catch (error) {
+  }).catch(error => {
     console.error("Gemini API Error:", error);
     throw new Error("Failed to process medical notes. Please ensure the content is clear.");
-  }
+  });
 }
 
 export async function extendQuiz(currentTopic: string, existingCount: number): Promise<QuizQuestion[]> {
@@ -100,7 +136,7 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
   Focus on the most common board-style complications or classic physical exam findings.
   Return only the JSON array of questions.`;
 
-  try {
+  return retryWithBackoff(async () => {
     const response = await ai.models.generateContent({
       model,
       contents: [{ parts: [{ text: prompt }] }],
@@ -113,8 +149,8 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
     });
 
     return JSON.parse(response.text || '[]') as QuizQuestion[];
-  } catch (error) {
+  }).catch(error => {
     console.error("Gemini Extension Error:", error);
     return [];
-  }
+  });
 }
