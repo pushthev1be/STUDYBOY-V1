@@ -1,0 +1,7 @@
+{
+  "name": " StudyGenius AI V2",
+  "description": "Transform your study notes and documents into interactive quizzes, flashcards, and comprehensive summaries using advanced AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
