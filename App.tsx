@@ -39,6 +39,31 @@ const INITIAL_STATS: UserStats = {
   lastActive: new Date().toISOString()
 };
 
+// SM-2 Spaced Repetition Algorithm
+const calculateNextReview = (quality: number, interval: number = 0, easeFactor: number = 2.5) => {
+  let newInterval = interval;
+  let newEaseFactor = easeFactor;
+
+  if (quality >= 3) {
+    // Correct - increase interval
+    if (interval === 0) newInterval = 1;
+    else if (interval === 1) newInterval = 3;
+    else newInterval = Math.round(interval * easeFactor);
+  } else {
+    // Incorrect - reset interval
+    newInterval = 1;
+  }
+
+  // Adjust ease factor
+  newEaseFactor = Math.max(1.3, easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
+
+  return {
+    interval: newInterval,
+    easeFactor: newEaseFactor,
+    nextReview: Date.now() + newInterval * 24 * 60 * 60 * 1000
+  };
+};
+
 const LOADING_STEPS = [
   "Extracting text from document...",
   "Identifying clinical indicators...",
@@ -331,7 +356,21 @@ const App: React.FC = () => {
 
     switch (viewMode) {
       case 'summary': return <SummaryView summary={material.summary} title={material.title} contentCoveragePercent={material.contentCoveragePercent} hasUnprocessedContent={!!material.unprocessedContent} />;
-      case 'flashcards': return <FlashcardView cards={material.flashcards} onCardViewed={() => updateProgress('flashcard')} />;
+      case 'flashcards': return <FlashcardView 
+          cards={material.flashcards} 
+          onCardViewed={() => updateProgress('flashcard')}
+          onCardRated={(cardIndex, quality) => {
+            const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
+            setMaterial({
+              ...material,
+              flashcards: material.flashcards.map((card, idx) => 
+                idx === cardIndex 
+                  ? { ...card, ...updated }
+                  : card
+              )
+            });
+          }}
+        />;
       case 'quiz': return <QuizView 
           questions={material.quiz} 
           onQuizComplete={(score, total) => updateProgress('quiz', { perfect: score === total })} 

@@ -8,6 +8,9 @@ export interface User {
 export interface Flashcard {
   question: string;
   answer: string;
+  interval?: number; // Days until next review
+  easeFactor?: number; // Difficulty multiplier (default 2.5)
+  nextReview?: number; // Unix timestamp for next review
 }
 
 export interface QuizQuestion {

@@ -6,9 +6,10 @@ import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 interface FlashcardViewProps {
   cards: Flashcard[];
   onCardViewed?: () => void;
+  onCardRated?: (cardIndex: number, quality: number) => void;
 }
 
-export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewed }) => {
+export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewed, onCardRated }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [viewedIndices, setViewedIndices] = useState<Set<number>>(new Set([0]));
@@ -89,11 +90,48 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
           </div>
 
           {/* Back */}
-          <div className="absolute inset-0 bg-indigo-600 border-2 border-indigo-500 rounded-3xl shadow-xl flex items-center justify-center p-8 backface-hidden rotate-y-180">
-            <div className="text-center">
+          <div className="absolute inset-0 bg-indigo-600 border-2 border-indigo-500 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
+            <div className="text-center mb-6">
               <span className="text-indigo-200 font-bold uppercase tracking-wider text-xs mb-4 block">Answer</span>
               <p className="text-2xl font-medium text-white">{currentCard.answer}</p>
             </div>
+            {isFlipped && (
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCardRated?.(currentIndex, 1);
+                    nextCard();
+                  }}
+                  className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold transition-colors"
+                  title="Hard - Review soon"
+                >
+                  Hard
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCardRated?.(currentIndex, 2);
+                    nextCard();
+                  }}
+                  className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-xs font-bold transition-colors"
+                  title="Good - Review in a few days"
+                >
+                  Good
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCardRated?.(currentIndex, 3);
+                    nextCard();
+                  }}
+                  className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold transition-colors"
+                  title="Easy - Mastered"
+                >
+                  Easy
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
