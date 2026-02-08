@@ -221,8 +221,33 @@ Common Misconception: [Frequent student error or misunderstanding]
 [Any additional relevant section based on content]`;
 
   const prompt = isImage 
-    ? `${structuredPrompt}\n\nAnalyze this clinical image and follow the structure above. Then provide 8 high-yield exam questions for the quiz.`
-    : `${structuredPrompt}\n\nBased on these notes:\n\n${content}\n\nFollow the structure above. Then provide 8 high-yield exam questions for the quiz and create 5-8 flashcard pairs.`;
+    ? `LEARNING OBJECTIVE: Help the student understand this clinical image deeply and retain the knowledge for long-term recall.
+
+IMPORTANT: Generate questions that test UNDERSTANDING, not just memorization. Include:
+- Application questions ("What would happen if...?")
+- Comparison questions ("How does this differ from...?")
+- Clinical reasoning questions ("Why does this happen?")
+- Mixed difficulty levels (easier recall + harder application)
+
+${structuredPrompt}
+
+Analyze this clinical image and follow the structure above. Then provide 8 exam-quality questions for the quiz, focusing on clinical reasoning and differential thinking.`
+    : `LEARNING OBJECTIVE: Help the student retain and apply this knowledge, not just memorize it.
+
+IMPORTANT: Generate questions that test UNDERSTANDING AND APPLICATION, not just facts. Include:
+- Recall questions (basic)
+- Application questions ("What would you do if...?")
+- Comparison questions (contrast with similar concepts)
+- Clinical reasoning questions ("Why is this the answer?")
+- Mixed difficulty and scenarios
+
+${structuredPrompt}
+
+Based on these notes:
+
+${content}
+
+Follow the structure above. Then provide 8 exam-quality questions for the quiz (various difficulty levels and question types) and create 5-8 flashcard pairs that test recall AND understanding.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -254,10 +279,22 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
 
-  const prompt = `The student is reviewing "${currentTopic}". 
-  Generate 3 NEW high-yield clinical vignettes. 
-  Focus on the most common board-style complications or classic physical exam findings.
-  Return only the JSON array of questions.`;
+  const prompt = `SPACED REPETITION MODE: Student is reviewing "${currentTopic}" to strengthen long-term memory.
+
+GENERATE 3 NEW questions that:
+1. Test DIFFERENT ASPECTS than previous questions (avoid repetition)
+2. Use VARIED SCENARIOS: different patient ages, presentations, complications
+3. Mix DIFFICULTY LEVELS: 1 easier recall, 1 intermediate, 1 advanced application
+4. INTERLEAVE related concepts: require distinguishing between similar ideas
+5. TARGET MISCONCEPTIONS: include edge cases and common board exam errors
+
+Each question must have:
+- A realistic clinical vignette
+- Clear correct answer with strong reasoning
+- Plausible distractors that test misconceptions
+- Explanation that reinforces learning
+
+Return only the JSON array of questions.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -285,10 +322,22 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
 
-  const prompt = `The student just got a question wrong about "${currentTopic}". 
-  Generate 2 NEW high-yield clinical vignettes to reinforce this concept. 
-  These should test similar pathophysiology, diagnostics, or management.
-  Return only the JSON array with 2 questions.`;
+  const prompt = `REMEDIATION MODE: Student got a question wrong about "${currentTopic}". Generate targeted learning questions.
+
+GENERATE 2 STRATEGIC questions that:
+1. TARGET THE MISCONCEPTION: Help student understand what went wrong
+2. DEEPEN UNDERSTANDING: Explain WHY the correct answer is right
+3. VARY THE SCENARIO: Different patient presentations of the same concept
+4. TEST APPLICATION: Apply concept in new contexts
+5. COMPARE & CONTRAST: Link to similar concepts to prevent future confusion
+
+Each question must:
+- Directly address the struggling concept
+- Approach from a different angle than the original
+- Have detailed explanations that clarify misconceptions
+- Include clinical reasoning for long-term retention
+
+Return only the JSON array with 2 questions.`;
 
   try {
     return await retryWithBackoff(async () => {
