@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Flashcard } from '../types';
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 
@@ -40,6 +40,21 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
     }, 150);
   };
 
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') nextCard();
+      if (e.key === 'ArrowLeft') prevCard();
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        setIsFlipped(!isFlipped);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isFlipped, currentIndex]);
+
   const currentCard = cards[currentIndex];
 
   return (
@@ -49,8 +64,17 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
       </div>
 
       <div 
-        className="relative w-full aspect-[4/3] perspective-1000 cursor-pointer group"
+        role="button"
+        tabIndex={0}
+        aria-label={`Flashcard ${currentIndex + 1} of ${cards.length}. ${isFlipped ? 'Showing answer: ' + currentCard.answer : 'Showing question: ' + currentCard.question}. Press Space or Enter to flip. Use arrow keys to navigate.`}
+        className="relative w-full aspect-[4/3] perspective-1000 cursor-pointer group outline-none focus:ring-4 focus:ring-indigo-500 rounded-3xl"
         onClick={() => setIsFlipped(!isFlipped)}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            setIsFlipped(!isFlipped);
+          }
+        }}
       >
         <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
           {/* Front */}
