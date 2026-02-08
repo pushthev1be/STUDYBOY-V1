@@ -19,7 +19,7 @@ interface StudySection {
 export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, contentCoveragePercent, hasUnprocessedContent }) => {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
 
-  // Parse summary to extract structured sections
+  // Parse summary to extract structured sections - more flexible
   const parseSummary = (text: string): StudySection[] => {
     const sections: StudySection[] = [];
     const lines = text.split('\n');
@@ -32,24 +32,37 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
       
       if (!line) continue;
 
-      // Big Picture Question
-      if (line.includes('Big Picture') || line.includes('Essential Question')) {
-        currentSection = { type: 'question', content: line.replace(/^[^:]*:\s*/, '') };
+      // Big Picture Question / Essential Question
+      if (line.match(/^[*•\-]?\s*(Big Picture|Essential Question|Key Question)/i)) {
+        const content = line.replace(/^[*•\-]?\s*(Big Picture|Essential Question|Key Question)[:\s]*/i, '');
+        if (content) {
+          currentSection = { type: 'question', content };
+          sections.push(currentSection);
+        }
+      }
+      // Common Misconceptions / Mistakes
+      else if (line.match(/^[*•\-]?\s*(Common Misconception|Common Mistake|Frequent Error)/i)) {
+        const title = line.replace(/^[*•\-]\s*/, '');
+        currentSection = { type: 'misconception', title, content: '' };
         sections.push(currentSection);
       }
-      // Common Misconceptions
-      else if (line.includes('Misconception') || line.includes('Mistake')) {
-        currentSection = { type: 'misconception', title: line, content: '' };
-        sections.push(currentSection);
-      }
-      // Section Headers
-      else if (line.endsWith(':') && !line.includes('|')) {
-        currentSection = { type: 'section', title: line.slice(0, -1), content: '' };
+      // Numbered/bulleted list items that look like section headers
+      else if (line.match(/^[0-9]+\.\s+[A-Z]/)) {
+        const title = line.replace(/^[0-9]+\.\s+/, '');
+        currentSection = { type: 'section', title, content: '' };
         sections.push(currentSection);
         tableLines = [];
         isTable = false;
       }
-      // Table detection
+      // Section Headers (ends with colon or is ALL CAPS)
+      else if ((line.endsWith(':') || /^[A-Z][A-Z\s&]+$/.test(line)) && !line.includes('|')) {
+        const title = line.replace(/:$/, '');
+        currentSection = { type: 'section', title, content: '' };
+        sections.push(currentSection);
+        tableLines = [];
+        isTable = false;
+      }
+      // Table detection - lines with pipes
       else if (line.includes('|') && !isTable) {
         isTable = true;
         tableLines = [line];
@@ -66,8 +79,11 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
         isTable = false;
         tableLines = [];
         // Continue with regular text
-        if (currentSection && currentSection.type === 'section') {
+        if (currentSection && (currentSection.type === 'section' || currentSection.type === 'misconception')) {
           currentSection.content = (currentSection.content || '') + (currentSection.content ? '\n' : '') + line;
+        } else {
+          currentSection = { type: 'text', content: line };
+          sections.push(currentSection);
         }
       }
       else if (currentSection) {
@@ -75,6 +91,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
           currentSection.content = (currentSection.content || '') + (currentSection.content ? '\n' : '') + line;
         }
       } else {
+        // Default: treat as regular text
         currentSection = { type: 'text', content: line };
         sections.push(currentSection);
       }
