@@ -2,6 +2,32 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StudyMaterial, QuizQuestion } from "../types";
 
+// Simple fallback data when API fails
+const FALLBACK_STUDY_MATERIAL: StudyMaterial = {
+  title: "Study Material",
+  summary: "Unable to generate AI content. Please try again or adjust your input.",
+  flashcards: [
+    { question: "What key concepts did you learn?", answer: "Review your notes for important topics." }
+  ],
+  quiz: [
+    {
+      question: "Which area do you need to study more?",
+      options: ["Pathophysiology", "Pharmacology", "Diagnosis", "Management"],
+      correctAnswer: 0,
+      explanation: "Focus on weak areas first."
+    }
+  ]
+};
+
+const FALLBACK_QUIZ: QuizQuestion[] = [
+  {
+    question: "Review mode: What's the main topic you're studying?",
+    options: ["Cardiology", "Pulmonology", "Gastroenterology", "Nephrology"],
+    correctAnswer: 0,
+    explanation: "Choose your focus area to generate new questions."
+  }
+];
+
 const STUDY_MATERIAL_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -99,32 +125,36 @@ async function retryWithBackoff<T>(
 
 export async function processStudyContent(content: string, isImage: boolean = false): Promise<StudyMaterial> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  // Using gemini-3-flash-preview for maximum speed and responsiveness
   const model = 'gemini-3-flash-preview';
 
   const prompt = isImage 
     ? `Analyze this clinical image. Create a PANCE-style study kit with 8 high-yield clinical vignette questions.`
     : `Based on these notes: \n\n${content}\n\nGenerate a PANCE-style study kit. 8 Clinical vignettes, summary, and flashcards. Focus on board-relevant info.`;
 
-  return retryWithBackoff(async () => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: isImage 
-        ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
-        : [{ parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: STUDY_MATERIAL_SCHEMA,
-        thinkingConfig: { thinkingBudget: 0 } // Disable thinking for pure speed
-      },
-    });
+  try {
+    return await retryWithBackoff(async () => {
+      const response = await ai.models.generateContent({
+        model,
+        contents: isImage 
+          ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
+          : [{ parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: STUDY_MATERIAL_SCHEMA,
+          thinkingConfig: { thinkingBudget: 0 }
+        },
+      });
 
-    return JSON.parse(response.text || '{}') as StudyMaterial;
-  }).catch(error => {
+      const result = JSON.parse(response.text || '{}') as StudyMaterial;
+      if (!result.title || !result.summary) throw new Error("Invalid response structure");
+      return result;
+    });
+  } catch (error) {
     console.error("Gemini API Error:", error);
-    throw new Error("Failed to process medical notes. Please ensure the content is clear.");
-  });
+    // Return fallback instead of throwing
+    return FALLBACK_STUDY_MATERIAL;
+  }
 }
 
 export async function extendQuiz(currentTopic: string, existingCount: number): Promise<QuizQuestion[]> {
@@ -136,23 +166,26 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
   Focus on the most common board-style complications or classic physical exam findings.
   Return only the JSON array of questions.`;
 
-  return retryWithBackoff(async () => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-        thinkingConfig: { thinkingBudget: 0 }
-      },
-    });
+  try {
+    return await retryWithBackoff(async () => {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
+          thinkingConfig: { thinkingBudget: 0 }
+        },
+      });
 
-    return JSON.parse(response.text || '[]') as QuizQuestion[];
-  }).catch(error => {
+      return JSON.parse(response.text || '[]') as QuizQuestion[];
+    });
+  } catch (error) {
     console.error("Gemini Extension Error:", error);
-    return [];
-  });
+    // Return fallback questions instead of empty array
+    return FALLBACK_QUIZ;
+  }
 }
 
 export async function generateQuestionForFailure(currentTopic: string): Promise<QuizQuestion[]> {
@@ -164,21 +197,24 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
   These should test similar pathophysiology, diagnostics, or management.
   Return only the JSON array with 2 questions.`;
 
-  return retryWithBackoff(async () => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-        thinkingConfig: { thinkingBudget: 0 }
-      },
-    });
+  try {
+    return await retryWithBackoff(async () => {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
+          thinkingConfig: { thinkingBudget: 0 }
+        },
+      });
 
-    return JSON.parse(response.text || '[]') as QuizQuestion[];
-  }).catch(error => {
+      return JSON.parse(response.text || '[]') as QuizQuestion[];
+    });
+  } catch (error) {
     console.error("Generate Question for Failure Error:", error);
-    return [];
-  });
+    // Return fallback instead of empty array
+    return FALLBACK_QUIZ.slice(0, 2);
+  }
 }
