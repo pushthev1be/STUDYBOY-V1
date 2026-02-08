@@ -125,15 +125,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
 
     return sections.length > 0 ? sections : [{ type: 'text', content: text }];
   };
-    if (isTable && tableLines.length > 0) {
-      const tableData = parseTable(tableLines);
-      if (tableData.length > 0) {
-        sections.push({ type: 'table', tableData });
-      }
-    }
-
-    return sections.length > 0 ? sections : [{ type: 'text', content: text }];
-  };
 
   const parseTable = (lines: string[]): { left: string; right: string }[] => {
     const cells: { left: string; right: string }[] = [];
