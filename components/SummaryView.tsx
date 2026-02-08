@@ -30,74 +30,101 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
-      if (!line) continue;
-
-      // Big Picture Question / Essential Question
-      if (line.match(/^[*•\-]?\s*(Big Picture|Essential Question|Key Question)/i)) {
-        const content = line.replace(/^[*•\-]?\s*(Big Picture|Essential Question|Key Question)[:\s]*/i, '');
-        if (content) {
-          currentSection = { type: 'question', content };
-          sections.push(currentSection);
+      if (!line) {
+        // Empty line - flush table if in progress
+        if (isTable && tableLines.length > 0) {
+          const tableData = parseTable(tableLines);
+          if (tableData.length > 0) {
+            sections.push({ type: 'table', tableData });
+          }
+          isTable = false;
+          tableLines = [];
         }
+        continue;
       }
-      // Common Misconceptions / Mistakes
-      else if (line.match(/^[*•\-]?\s*(Common Misconception|Common Mistake|Frequent Error)/i)) {
-        const title = line.replace(/^[*•\-]\s*/, '');
-        currentSection = { type: 'misconception', title, content: '' };
-        sections.push(currentSection);
-      }
-      // Numbered/bulleted list items that look like section headers
-      else if (line.match(/^[0-9]+\.\s+[A-Z]/)) {
-        const title = line.replace(/^[0-9]+\.\s+/, '');
-        currentSection = { type: 'section', title, content: '' };
-        sections.push(currentSection);
-        tableLines = [];
-        isTable = false;
-      }
-      // Section Headers (ends with colon or is ALL CAPS)
-      else if ((line.endsWith(':') || /^[A-Z][A-Z\s&]+$/.test(line)) && !line.includes('|')) {
+
+      // Check if this is a section header (key indicator: ends with colon)
+      const isSectionHeader = line.endsWith(':') && !line.includes('|');
+
+      if (isSectionHeader) {
+        // Save any table in progress
+        if (isTable && tableLines.length > 0) {
+          const tableData = parseTable(tableLines);
+          if (tableData.length > 0) {
+            sections.push({ type: 'table', tableData });
+          }
+          isTable = false;
+          tableLines = [];
+        }
+
+        // Detect section type by header content
+        const headerLower = line.toLowerCase();
         const title = line.replace(/:$/, '');
-        currentSection = { type: 'section', title, content: '' };
+
+        if (headerLower.includes('big picture') || headerLower.includes('essential question')) {
+          currentSection = { type: 'question', content: '' };
+        } else if (headerLower.includes('misconception') || headerLower.includes('mistake')) {
+          currentSection = { type: 'misconception', title, content: '' };
+        } else {
+          // Generic section (Key Concepts, Comparison Table, Test Yourself, etc.)
+          currentSection = { type: 'section', title, content: '' };
+        }
         sections.push(currentSection);
-        tableLines = [];
-        isTable = false;
       }
-      // Table detection - lines with pipes
+      // Detect table start (line with | delimiter)
       else if (line.includes('|') && !isTable) {
         isTable = true;
         tableLines = [line];
       }
+      // Continue table
       else if (isTable && line.includes('|')) {
         tableLines.push(line);
       }
+      // End of table - process it
       else if (isTable && !line.includes('|')) {
-        // Process table
         const tableData = parseTable(tableLines);
         if (tableData.length > 0) {
           sections.push({ type: 'table', tableData });
         }
         isTable = false;
         tableLines = [];
-        // Continue with regular text
+        
+        // Add this line to current section
         if (currentSection && (currentSection.type === 'section' || currentSection.type === 'misconception')) {
           currentSection.content = (currentSection.content || '') + (currentSection.content ? '\n' : '') + line;
         } else {
-          currentSection = { type: 'text', content: line };
-          sections.push(currentSection);
+          // Create a text section for orphaned content
+          sections.push({ type: 'text', content: line });
         }
       }
+      // Add content to current section
       else if (currentSection) {
-        if (currentSection.type === 'section' || currentSection.type === 'misconception' || currentSection.type === 'text') {
+        if (currentSection.type === 'question') {
+          // For Big Picture Question, store the first non-empty line as content
+          if (!currentSection.content) {
+            currentSection.content = line;
+          } else {
+            currentSection.content += '\n' + line;
+          }
+        } else if (currentSection.type === 'section' || currentSection.type === 'misconception') {
           currentSection.content = (currentSection.content || '') + (currentSection.content ? '\n' : '') + line;
         }
       } else {
-        // Default: treat as regular text
-        currentSection = { type: 'text', content: line };
-        sections.push(currentSection);
+        // No current section - create a text section
+        sections.push({ type: 'text', content: line });
       }
     }
 
-    // Handle remaining table
+    // Handle any remaining table
+    if (isTable && tableLines.length > 0) {
+      const tableData = parseTable(tableLines);
+      if (tableData.length > 0) {
+        sections.push({ type: 'table', tableData });
+      }
+    }
+
+    return sections.length > 0 ? sections : [{ type: 'text', content: text }];
+  };
     if (isTable && tableLines.length > 0) {
       const tableData = parseTable(tableLines);
       if (tableData.length > 0) {

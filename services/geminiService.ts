@@ -193,50 +193,47 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `CRITICAL: You MUST format the summary using EXACTLY these section headers. Each section must be clearly labeled.
+    ? `GENERATE SUMMARY WITH CONTENT UNDER EACH SECTION HEADER:
 
-Big Picture Question: [State the core concept in one clear question]
+Big Picture Question: [Write the question on the same line as the header, then continue with explanation on next lines]
 
 Key Concepts & Definitions:
-[List 2-3 key terms with brief definitions, one per line]
+[List key terms with definitions, one per line. Include 2-3 concepts]
 
 Comparison Table:
 | Concept A | Concept B |
 | --- | --- |
-| Feature | Feature |
+| Feature 1 | Feature 1 |
 
 Test Yourself:
-[List 2-3 practice questions]
+[List 2-3 practice questions here, one per line]
 
-Common Misconception: [State one common error and the correct understanding]
+Common Misconception: [Explain the misconception and correct understanding here]
 
----
+NOW analyze this clinical image following EXACTLY this structure with CONTENT under each header. Then generate 8 exam questions and 5-8 flashcard pairs.`
+    : `GENERATE SUMMARY WITH CONTENT UNDER EACH SECTION HEADER:
 
-NOW analyze this clinical image following EXACTLY this structure above. Be precise with section headers. Then generate 8 exam questions for the quiz and 5-8 flashcard pairs.`
-    : `CRITICAL: You MUST format the summary using EXACTLY these section headers. Each section must be clearly labeled and separated.
-
-Big Picture Question: [State the core concept in one clear question]
+Big Picture Question: [Write the question on the same line as the header, then continue with explanation on next lines]
 
 Key Concepts & Definitions:
-[List 2-3 essential terms with brief definitions, one per line]
+[List key terms with definitions, one per line. Include 2-3 concepts]
 
 Comparison Table:
 | Concept A | Concept B |
 | --- | --- |
-| Feature | Feature |
+| Feature 1 | Feature 1 |
 
 Test Yourself:
-[List 2-3 practice questions]
+[List 2-3 practice questions here, one per line]
 
-Common Misconception: [State one common error and the correct understanding]
+Common Misconception: [Explain the misconception and correct understanding here]
 
 ---
 
-NOW analyze these notes and follow EXACTLY the structure above:
-
+NOTES TO ANALYZE:
 ${content}
 
-Use the exact section headers above. Then generate 8 exam questions for the quiz and create 5-8 flashcard pairs.`;
+Follow the structure above EXACTLY. Put ACTUAL CONTENT on the lines following each section header (not empty sections). Then generate 8 exam questions and create 5-8 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
