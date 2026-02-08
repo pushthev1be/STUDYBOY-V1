@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Flashcard } from '../types';
-import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from 'lucide-react';
 
 interface FlashcardViewProps {
   cards: Flashcard[];
@@ -9,10 +9,13 @@ interface FlashcardViewProps {
   onCardRated?: (cardIndex: number, quality: number) => void;
 }
 
+const FLASHCARDS_PER_LOAD = 15;
+
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewed, onCardRated }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [viewedIndices, setViewedIndices] = useState<Set<number>>(new Set([0]));
+  const [displayedCards, setDisplayedCards] = useState(Math.min(FLASHCARDS_PER_LOAD, cards.length));
 
   const markAsViewed = (index: number) => {
     if (!viewedIndices.has(index)) {
@@ -25,7 +28,12 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
 
   const nextCard = () => {
     setIsFlipped(false);
-    const nextIdx = (currentIndex + 1) % cards.length;
+    let nextIdx = currentIndex + 1;
+    // If at end of displayed cards and more cards exist, don't wrap
+    if (nextIdx >= displayedCards && displayedCards < cards.length) {
+      return;
+    }
+    nextIdx = nextIdx % displayedCards;
     setTimeout(() => {
       setCurrentIndex(nextIdx);
       markAsViewed(nextIdx);
@@ -34,11 +42,16 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
 
   const prevCard = () => {
     setIsFlipped(false);
-    const prevIdx = (currentIndex - 1 + cards.length) % cards.length;
+    const prevIdx = (currentIndex - 1 + displayedCards) % displayedCards;
     setTimeout(() => {
       setCurrentIndex(prevIdx);
       markAsViewed(prevIdx);
     }, 150);
+  };
+
+  const loadMore = () => {
+    const newCount = Math.min(displayedCards + FLASHCARDS_PER_LOAD, cards.length);
+    setDisplayedCards(newCount);
   };
 
   // Keyboard navigation
@@ -61,7 +74,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
   return (
     <div className="flex flex-col items-center justify-center space-y-8 py-12 max-w-lg mx-auto">
       <div className="text-slate-500 font-medium text-sm">
-        Card {currentIndex + 1} of {cards.length}
+        Card {currentIndex + 1} of {displayedCards} {displayedCards < cards.length && `(${cards.length} total)`}
       </div>
 
       <div 
@@ -150,6 +163,16 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
           <ChevronRight size={24} />
         </button>
       </div>
+
+      {displayedCards < cards.length && (
+        <button
+          onClick={loadMore}
+          className="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+        >
+          <ChevronDown size={20} />
+          Load More Flashcards
+        </button>
+      )}
     </div>
   );
 };
