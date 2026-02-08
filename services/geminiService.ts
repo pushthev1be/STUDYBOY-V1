@@ -1,6 +1,29 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { StudyMaterial, QuizQuestion } from "../types";
+import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
+
+// Domain-specific system instructions
+const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
+  'PA': `You are a Senior PA School Professor specializing in PANCE prep.
+1. PANCE FORMAT: Every question is a clinical vignette (Age, Gender, Presentation).
+2. BOARD-FOCUSED: Diagnose, Initial Test, Gold Standard, or First-line Management.
+3. HIGH-YIELD: Focus on common conditions, classic presentations, board-style reasoning.`,
+
+  'Nursing': `You are a Nursing Education Expert preparing students for NCLEX.
+1. NURSING FOCUS: Assess, Diagnose, Plan, Implement, Evaluate (ADPIE framework).
+2. PATIENT CARE: Emphasize nursing interventions, patient safety, and clinical judgment.
+3. SCOPE: Cover pathophysiology, assessment, nursing actions, and patient education.`,
+
+  'Medical': `You are a Medical School Professor for USMLE/board prep.
+1. MEDICAL LEVEL: Detailed pathophysiology, mechanisms, and evidence-based reasoning.
+2. COMPREHENSIVE: Cover etiology, pathology, presentation, diagnosis, and management.
+3. CLINICAL VIGNETTES: Realistic case presentations with board-style questions.`,
+
+  'GenEd': `You are an expert educator creating comprehensive study materials.
+1. ACCESSIBLE: Clear, well-organized content for any learning level.
+2. COMPREHENSIVE: Cover key concepts, relationships, and clinical applications.
+3. VARIED: Mix of definitions, mechanisms, comparisons, and practical examples.`
+};
 
 // Simple fallback data when API fails
 const FALLBACK_STUDY_MATERIAL: StudyMaterial = {
@@ -81,11 +104,8 @@ const ADDITIONAL_QUESTIONS_SCHEMA = {
   }
 };
 
-const SYSTEM_INSTRUCTION = `You are a Senior PA School Professor.
-1. SPEED & ACCURACY: Provide concise but high-yield medical content.
-2. PANCE FORMAT: Every question is a clinical vignette (Age, Gender, Presentation).
-3. KEY FOCUS: Diagnosis, Initial Test, Gold Standard, or First-line Management.
-4. CLINICAL PEARLS: Brief, high-yield takeaways only.`;
+// Default system instruction (PA focused)
+const DEFAULT_SYSTEM_INSTRUCTION = DOMAIN_INSTRUCTIONS['PA'];
 
 // Retry logic with exponential backoff
 async function retryWithBackoff<T>(
@@ -123,13 +143,14 @@ async function retryWithBackoff<T>(
   throw lastError;
 }
 
-export async function processStudyContent(content: string, isImage: boolean = false): Promise<StudyMaterial> {
+export async function processStudyContent(content: string, isImage: boolean = false, domain: StudyDomain = 'PA'): Promise<StudyMaterial> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
+  const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `Analyze this clinical image. Create a PANCE-style study kit with 8 high-yield clinical vignette questions.`
-    : `Based on these notes: \n\n${content}\n\nGenerate a PANCE-style study kit. 8 Clinical vignettes, summary, and flashcards. Focus on board-relevant info.`;
+    ? `Analyze this clinical image. Create a comprehensive study kit with 8 high-yield questions relevant to this field.`
+    : `Based on these notes: \n\n${content}\n\nGenerate a comprehensive study kit with 8 questions, a summary, and flashcards. Focus on the most important concepts.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -139,7 +160,7 @@ export async function processStudyContent(content: string, isImage: boolean = fa
           ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
           : [{ parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: systemInstruction,
           responseMimeType: "application/json",
           responseSchema: STUDY_MATERIAL_SCHEMA,
           thinkingConfig: { thinkingBudget: 0 }

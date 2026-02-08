@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope } from 'lucide-react';
-import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState } from './types';
+import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain } from './types';
 import { processStudyContent, extendQuiz, generateQuestionForFailure } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
@@ -86,6 +86,7 @@ const App: React.FC = () => {
   const [loadingStep, setLoadingStep] = useState(0);
   const [processedChars, setProcessedChars] = useState(0);
   const [processingState, setProcessingState] = useState<ProcessingState | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<StudyDomain>('PA');
   
   const [stats, setStats] = useState<UserStats>(INITIAL_STATS);
   const [achievements, setAchievements] = useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
@@ -255,7 +256,7 @@ const App: React.FC = () => {
         fileName: file.name
       });
 
-      const result = await processStudyContent(content, isImage);
+      const result = await processStudyContent(content, isImage, selectedDomain);
       const coveragePercent = unprocessedContent 
         ? Math.round((content.length / (content.length + unprocessedContent.length)) * 100)
         : 100;
@@ -437,13 +438,37 @@ const App: React.FC = () => {
           <div className="max-w-3xl mx-auto text-center animate-fade-in">
             <div className="mb-12">
               <h2 className="text-5xl font-extrabold text-slate-900 mb-6 leading-tight">Crush your rotations, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">{user?.username}</span></h2>
-              <p className="text-xl text-slate-500 max-w-xl mx-auto leading-relaxed">PANCE prep optimized for large files. Upload clinical notes up to <span className="text-indigo-600 font-bold">15MB</span> and let us parse them.</p>
+              <p className="text-xl text-slate-500 max-w-xl mx-auto leading-relaxed">Upload study materials and generate smart study content tailored to your field.</p>
             </div>
+
+            {/* Domain Selector */}
+            <div className="mb-8 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <label className="block text-sm font-bold text-slate-700 mb-4">What are you studying for?</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {(['PA', 'Nursing', 'Medical', 'GenEd'] as const).map((domain) => (
+                  <button
+                    key={domain}
+                    onClick={() => setSelectedDomain(domain)}
+                    className={`py-3 px-4 rounded-xl font-bold transition-all ${
+                      selectedDomain === domain
+                        ? 'bg-indigo-600 text-white shadow-lg'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {domain === 'PA' && 'PA (PANCE)'}
+                    {domain === 'Nursing' && 'Nursing (NCLEX)'}
+                    {domain === 'Medical' && 'Medical (USMLE)'}
+                    {domain === 'GenEd' && 'General'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="relative group">
               <label className="flex flex-col items-center justify-center w-full h-80 border-2 border-dashed border-slate-300 rounded-[3rem] bg-white hover:bg-slate-50 hover:border-indigo-400 transition-all cursor-pointer shadow-sm">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <div className="bg-slate-100 p-6 rounded-full mb-6 group-hover:scale-110 group-hover:bg-indigo-50 transition-all duration-300"><Upload className="text-slate-400 group-hover:text-indigo-500" size={48} /></div>
-                  <p className="mb-2 text-2xl font-bold text-slate-700">Drop your clinical notes here</p>
+                  <p className="mb-2 text-2xl font-bold text-slate-700">Drop your notes here</p>
                   <p className="text-slate-400">PDF, Text, or Document Images (Max 15MB)</p>
                 </div>
                 <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,image/*" />

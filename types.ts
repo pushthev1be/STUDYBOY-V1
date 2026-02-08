@@ -73,6 +73,8 @@ export enum AppState {
   ERROR = 'ERROR'
 }
 
+export type StudyDomain = 'PA' | 'Nursing' | 'Medical' | 'GenEd';
+
 export type ViewMode = 'summary' | 'flashcards' | 'quiz' | 'stats';
 
 export interface ProcessingState {
