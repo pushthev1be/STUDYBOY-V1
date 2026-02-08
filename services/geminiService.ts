@@ -193,7 +193,7 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
         model,
         contents: [{ parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
           thinkingConfig: { thinkingBudget: 0 }
@@ -224,7 +224,7 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
         model,
         contents: [{ parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
           thinkingConfig: { thinkingBudget: 0 }
