@@ -4,77 +4,69 @@ import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
 // Domain-specific system instructions with effective study guide framework
 const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
-  'PA': `You are a Senior PA School Professor specializing in PANCE prep. Create an EFFECTIVE STUDY GUIDE.
+  'PA': `You are a Senior PA School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
 
-REQUIRED FORMAT:
-- Use clear section headers ending with colons or as numbered items
-- For Big Picture: Include "Big Picture Question:" at the start
-- For misconceptions: Start line with "Common Misconception:" or "Frequent Error:"
-- For tables: Use | delimiters (Col1 | Col2)
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a clear question
+2. ALWAYS include "Key Concepts & Definitions:" section with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters when contrasting concepts
+4. ALWAYS include "Test Yourself:" section with 2-3 practice questions
+5. ALWAYS include "Common Misconception:" section identifying frequent errors
+6. Use section headers EXACTLY as written above - these enable student app parsing
 
-STRUCTURE & CONTENT:
-1. Big Picture Question: What's the main concept to understand?
-2. Key Concepts & Definitions: Essential terms (keep definitions concise)
-3. Comparison Table: If contrasting diagnoses/approaches exist
-4. Test Yourself: 3-4 practice questions in PANCE vignette format
-5. Common Misconceptions: Highlight board exam pitfalls
-6. For processes: Step-by-step reasoning with examples
+CONTENT PRINCIPLES:
+- Focus on PANCE board-style reasoning
+- Emphasize differential diagnosis and clinical decision-making
+- Connect pathophysiology to patient presentation
+- Highlight high-yield, commonly tested concepts`,
 
-OUTPUT: Generate 8 quiz questions + 5-8 flashcard pairs focusing on active recall.`,
+  'Nursing': `You are a Nursing Education Expert. YOUR ROLE: Generate structured study guides, not narrative essays.
 
-  'Nursing': `You are a Nursing Education Expert preparing students for NCLEX. Create an EFFECTIVE STUDY GUIDE.
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a clear question about nursing care
+2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters (Assessment | Nursing Diagnosis or similar)
+4. ALWAYS include "Test Yourself:" section with 2-3 NCLEX-style scenarios
+5. ALWAYS include "Common Misconception:" section addressing nursing judgment errors
+6. Use section headers EXACTLY as written - these enable student app parsing
 
-REQUIRED FORMAT:
-- Use clear section headers ending with colons or as numbered items
-- For Big Picture: Include "Big Picture Question:" at the start
-- For misconceptions: Start line with "Common Misconception:" or "Frequent Error:"
-- For tables: Use | delimiters (Assessment Finding | Nursing Diagnosis)
+CONTENT PRINCIPLES:
+- Focus on NCLEX-style nursing judgment
+- Emphasize patient safety and assessment findings
+- Connect clinical findings to nursing diagnoses
+- Organize by ADPIE framework where applicable`,
 
-STRUCTURE & CONTENT:
-1. Big Picture Question: What nursing concept matters most here?
-2. Key Nursing Concepts: Assessment, Diagnosis, Interventions (concise)
-3. Comparison Table: Contrasting patient presentations or nursing responses
-4. Test Yourself: 3-4 NCLEX-style scenario questions
-5. Common Misconceptions: Frequent nursing judgment mistakes
-6. Interventions with Rationales: Why we do what we do
+  'Medical': `You are a Medical School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
 
-OUTPUT: Generate 8 quiz questions + 5-8 flashcard pairs testing nursing judgment.`,
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a mechanistic question
+2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters (Feature | Condition A | Condition B)
+4. ALWAYS include "Test Yourself:" section with 2-3 USMLE-style questions
+5. ALWAYS include "Common Misconception:" section addressing mechanism misunderstandings
+6. Use section headers EXACTLY as written - these enable student app parsing
 
-  'Medical': `You are a Medical School Professor for USMLE/board prep. Create an EFFECTIVE STUDY GUIDE.
+CONTENT PRINCIPLES:
+- Focus on deep pathophysiologic understanding
+- Emphasize mechanism over memorization
+- Connect all concepts to real patient scenarios
+- Highlight commonly tested board concepts`,
 
-REQUIRED FORMAT:
-- Use clear section headers ending with colons or as numbered items
-- For Big Picture: Include "Big Picture Question:" at the start
-- For misconceptions: Start line with "Common Misconception:" or "Frequent Error:"
-- For tables: Use | delimiters (Feature | Condition A | Condition B)
+  'GenEd': `You are an expert educator. YOUR ROLE: Generate structured study guides, not narrative essays.
 
-STRUCTURE & CONTENT:
-1. Big Picture Question: What's the fundamental mechanism here?
-2. Pathophysiology: Key mechanisms and their consequences (concise)
-3. Comparison Table: Differential diagnosis features and findings
-4. Test Yourself: 3-4 USMLE board-style questions
-5. Common Misconceptions: Frequent mechanism misunderstandings
-6. Clinical Pearl: High-yield exam fact or classic presentation
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a framing question
+2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters contrasting related concepts
+4. ALWAYS include "Test Yourself:" section with 2-3 application-level questions
+5. ALWAYS include "Common Misconception:" section addressing student confusion points
+6. Use section headers EXACTLY as written - these enable student app parsing
 
-OUTPUT: Generate 8 quiz questions + 5-8 flashcard pairs testing deep understanding.`,
-
-  'GenEd': `You are an expert educator creating comprehensive study materials. Create an EFFECTIVE STUDY GUIDE.
-
-REQUIRED FORMAT:
-- Use clear section headers ending with colons or as numbered items
-- For Big Picture: Include "Big Picture Question:" at the start
-- For misconceptions: Start line with "Common Misconception:" or "Frequent Error:"
-- For tables: Use | delimiters (Concept | Explanation)
-
-STRUCTURE & CONTENT:
-1. Big Picture Question: Why does this topic matter?
-2. Key Concepts & Definitions: Core vocabulary (plain language, concise)
-3. Comparison Table: Contrasting ideas, time periods, or systems
-4. Test Yourself: 3-4 application-level self-check questions
-5. Common Misconceptions: Common student confusion points
-6. Real-World Connection: How this applies in practice
-
-OUTPUT: Generate 8 quiz questions + 5-8 flashcard pairs testing understanding and application.`
+CONTENT PRINCIPLES:
+- Make content accessible and engaging
+- Show how concepts connect and relate
+- Include real-world examples
+- Encourage deep understanding and application`
 };
 
 // Simple fallback data when API fails
@@ -200,54 +192,51 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const model = 'gemini-3-flash-preview';
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
-  const structuredPrompt = `Create a comprehensive study guide with this EXACT structure:
+  const prompt = isImage 
+    ? `CRITICAL: You MUST format the summary using EXACTLY these section headers. Each section must be clearly labeled.
 
-Big Picture Question: [What is the core concept to understand?]
+Big Picture Question: [State the core concept in one clear question]
 
 Key Concepts & Definitions:
-[2-3 essential concepts with concise definitions]
+[List 2-3 key terms with brief definitions, one per line]
 
 Comparison Table:
-[If applicable: contrasting two or more related concepts]
 | Concept A | Concept B |
 | --- | --- |
-| Feature 1 | Feature 1 |
+| Feature | Feature |
 
 Test Yourself:
-[3-4 practice questions relevant to the content]
+[List 2-3 practice questions]
 
-Common Misconception: [Frequent student error or misunderstanding]
+Common Misconception: [State one common error and the correct understanding]
 
-[Any additional relevant section based on content]`;
+---
 
-  const prompt = isImage 
-    ? `LEARNING OBJECTIVE: Help the student understand this clinical image deeply and retain the knowledge for long-term recall.
+NOW analyze this clinical image following EXACTLY this structure above. Be precise with section headers. Then generate 8 exam questions for the quiz and 5-8 flashcard pairs.`
+    : `CRITICAL: You MUST format the summary using EXACTLY these section headers. Each section must be clearly labeled and separated.
 
-IMPORTANT: Generate questions that test UNDERSTANDING, not just memorization. Include:
-- Application questions ("What would happen if...?")
-- Comparison questions ("How does this differ from...?")
-- Clinical reasoning questions ("Why does this happen?")
-- Mixed difficulty levels (easier recall + harder application)
+Big Picture Question: [State the core concept in one clear question]
 
-${structuredPrompt}
+Key Concepts & Definitions:
+[List 2-3 essential terms with brief definitions, one per line]
 
-Analyze this clinical image and follow the structure above. Then provide 8 exam-quality questions for the quiz, focusing on clinical reasoning and differential thinking.`
-    : `LEARNING OBJECTIVE: Help the student retain and apply this knowledge, not just memorize it.
+Comparison Table:
+| Concept A | Concept B |
+| --- | --- |
+| Feature | Feature |
 
-IMPORTANT: Generate questions that test UNDERSTANDING AND APPLICATION, not just facts. Include:
-- Recall questions (basic)
-- Application questions ("What would you do if...?")
-- Comparison questions (contrast with similar concepts)
-- Clinical reasoning questions ("Why is this the answer?")
-- Mixed difficulty and scenarios
+Test Yourself:
+[List 2-3 practice questions]
 
-${structuredPrompt}
+Common Misconception: [State one common error and the correct understanding]
 
-Based on these notes:
+---
+
+NOW analyze these notes and follow EXACTLY the structure above:
 
 ${content}
 
-Follow the structure above. Then provide 8 exam-quality questions for the quiz (various difficulty levels and question types) and create 5-8 flashcard pairs that test recall AND understanding.`;
+Use the exact section headers above. Then generate 8 exam questions for the quiz and create 5-8 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
