@@ -61,13 +61,17 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
         const headerLower = line.toLowerCase();
         const title = line.replace(/:$/, '');
 
+        // Check if there's content after the colon on the same line
+        const colonIndex = line.indexOf(':');
+        const inlineContent = line.substring(colonIndex + 1).trim();
+
         if (headerLower.includes('big picture') || headerLower.includes('essential question')) {
-          currentSection = { type: 'question', content: '' };
+          currentSection = { type: 'question', content: inlineContent };
         } else if (headerLower.includes('misconception') || headerLower.includes('mistake')) {
-          currentSection = { type: 'misconception', title, content: '' };
+          currentSection = { type: 'misconception', title, content: inlineContent };
         } else {
           // Generic section (Key Concepts, Comparison Table, Test Yourself, etc.)
-          currentSection = { type: 'section', title, content: '' };
+          currentSection = { type: 'section', title, content: inlineContent };
         }
         sections.push(currentSection);
       }

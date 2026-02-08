@@ -193,47 +193,51 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `GENERATE SUMMARY WITH CONTENT UNDER EACH SECTION HEADER:
+    ? `CRITICAL: Format summary with CONTENT, not empty sections.
 
-Big Picture Question: [Write the question on the same line as the header, then continue with explanation on next lines]
-
-Key Concepts & Definitions:
-[List key terms with definitions, one per line. Include 2-3 concepts]
-
-Comparison Table:
-| Concept A | Concept B |
-| --- | --- |
-| Feature 1 | Feature 1 |
-
-Test Yourself:
-[List 2-3 practice questions here, one per line]
-
-Common Misconception: [Explain the misconception and correct understanding here]
-
-NOW analyze this clinical image following EXACTLY this structure with CONTENT under each header. Then generate 8 exam questions and 5-8 flashcard pairs.`
-    : `GENERATE SUMMARY WITH CONTENT UNDER EACH SECTION HEADER:
-
-Big Picture Question: [Write the question on the same line as the header, then continue with explanation on next lines]
+Big Picture Question: [Clear question about the image]
 
 Key Concepts & Definitions:
-[List key terms with definitions, one per line. Include 2-3 concepts]
+- Term1: Definition
+- Term2: Definition  
+- Term3: Definition
 
 Comparison Table:
-| Concept A | Concept B |
-| --- | --- |
-| Feature 1 | Feature 1 |
+| Feature | Concept A | Concept B |
+| --- | --- | --- |
+| Aspect 1 | Detail | Detail |
 
 Test Yourself:
-[List 2-3 practice questions here, one per line]
+- Question 1?
+- Question 2?
 
-Common Misconception: [Explain the misconception and correct understanding here]
+Common Misconception: [State misconception] --> [Correct understanding]
 
----
+Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 5-8 flashcard pairs.`
+    : `CRITICAL: Format summary with CONTENT, not empty sections.
 
-NOTES TO ANALYZE:
+Big Picture Question: [Clear question about the core concept]
+
+Key Concepts & Definitions:
+- Term1: Definition
+- Term2: Definition  
+- Term3: Definition
+
+Comparison Table:
+| Feature | Concept A | Concept B |
+| --- | --- | --- |
+| Aspect 1 | Detail | Detail |
+
+Test Yourself:
+- Question 1?
+- Question 2?
+
+Common Misconception: [State misconception] --> [Correct understanding]
+
+ANALYZE THESE NOTES:
 ${content}
 
-Follow the structure above EXACTLY. Put ACTUAL CONTENT on the lines following each section header (not empty sections). Then generate 8 exam questions and create 5-8 flashcard pairs.`;
+Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 5-8 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
