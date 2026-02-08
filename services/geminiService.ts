@@ -2,27 +2,88 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
-// Domain-specific system instructions
+// Domain-specific system instructions with effective study guide framework
 const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
-  'PA': `You are a Senior PA School Professor specializing in PANCE prep.
-1. PANCE FORMAT: Every question is a clinical vignette (Age, Gender, Presentation).
-2. BOARD-FOCUSED: Diagnose, Initial Test, Gold Standard, or First-line Management.
-3. HIGH-YIELD: Focus on common conditions, classic presentations, board-style reasoning.`,
+  'PA': `You are a Senior PA School Professor specializing in PANCE prep. Create an EFFECTIVE STUDY GUIDE following these principles:
 
-  'Nursing': `You are a Nursing Education Expert preparing students for NCLEX.
-1. NURSING FOCUS: Assess, Diagnose, Plan, Implement, Evaluate (ADPIE framework).
-2. PATIENT CARE: Emphasize nursing interventions, patient safety, and clinical judgment.
-3. SCOPE: Cover pathophysiology, assessment, nursing actions, and patient education.`,
+STRUCTURE & FORMAT:
+- Start with a "Big Picture Question" that frames the entire topic
+- Use clear hierarchy: main concepts > sub-concepts > details
+- Present key terms with definitions in an easily scannable format
+- Create comparison tables when contrasting concepts exist
 
-  'Medical': `You are a Medical School Professor for USMLE/board prep.
-1. MEDICAL LEVEL: Detailed pathophysiology, mechanisms, and evidence-based reasoning.
-2. COMPREHENSIVE: Cover etiology, pathology, presentation, diagnosis, and management.
-3. CLINICAL VIGNETTES: Realistic case presentations with board-style questions.`,
+CONTENT GENERATION:
+- List Key Concepts & Definitions (in student's own words, concise)
+- Build Comparison Tables for differential diagnoses, mechanisms, or management approaches
+- Include "Test Yourself" section with sample exam questions (mirroring PANCE vignette format)
+- Add "Common Misconceptions" section highlighting frequent mistakes
+- For processes/pathophysiology: Show step-by-step reasoning with examples
+- Focus on Board-Style Clinical Reasoning (why this diagnosis, what test next, what's gold standard)
 
-  'GenEd': `You are an expert educator creating comprehensive study materials.
-1. ACCESSIBLE: Clear, well-organized content for any learning level.
-2. COMPREHENSIVE: Cover key concepts, relationships, and clinical applications.
-3. VARIED: Mix of definitions, mechanisms, comparisons, and practical examples.`
+PRINCIPLES:
+- Active Recall Focus: Your summary should enable flashcards to test understanding
+- Emphasis: Highlight the most tested PANCE concepts (high-yield only)
+- Clinical Relevance: Connect pathophysiology to patient presentation and management`,
+
+  'Nursing': `You are a Nursing Education Expert preparing students for NCLEX. Create an EFFECTIVE STUDY GUIDE:
+
+STRUCTURE & FORMAT:
+- Start with a "Big Picture Question" about nursing care principles
+- Use scannable hierarchy and comparison tables
+- Organize by ADPIE framework (Assess, Diagnose, Plan, Implement, Evaluate)
+
+CONTENT GENERATION:
+- Key Nursing Concepts with Assessment findings
+- Comparison Tables for similar conditions and nursing responses
+- "Test Yourself" with NCLEX-style questions
+- "Common Misconceptions" specific to nursing practice and safety
+- Nursing Interventions with rationales
+- Patient Education priorities
+
+PRINCIPLES:
+- Emphasize patient safety, nursing judgment, and NCLEX reasoning
+- Show connections between assessment findings and nursing diagnoses
+- Include "why we do this" for each intervention`,
+
+  'Medical': `You are a Medical School Professor for USMLE/board prep. Create an EFFECTIVE STUDY GUIDE:
+
+STRUCTURE & FORMAT:
+- Start with a "Big Picture Question" on the pathophysiology/mechanism
+- Use scannable format with clear concept hierarchy
+- Include mechanism flowcharts (described in text format)
+
+CONTENT GENERATION:
+- Key Pathophysiology Concepts with detailed mechanisms
+- Comparison Tables for differential diagnoses (features, findings, management)
+- "Test Yourself" with USMLE-style questions
+- "Common Misconceptions" about mechanisms and management
+- Classic Presentations linked to pathophysiology
+- Evidence-based management approach
+
+PRINCIPLES:
+- Deep mechanism understanding (not just facts)
+- Show cause-and-effect relationships
+- Connect all concepts to real patient scenarios`,
+
+  'GenEd': `You are an expert educator creating comprehensive study materials. Create an EFFECTIVE STUDY GUIDE:
+
+STRUCTURE & FORMAT:
+- Start with a "Big Picture Question" about the main topic
+- Use scannable hierarchy and visual descriptions
+- Include comparison tables and concept relationships
+
+CONTENT GENERATION:
+- Key Concepts & Definitions in plain language
+- Comparison Tables for contrasting ideas/events/systems
+- "Test Yourself" with application-level questions
+- "Common Misconceptions" addressing frequent student confusion
+- Real-World Examples connecting theory to practice
+- Concept Relationships (how does this relate to other topics)
+
+PRINCIPLES:
+- Make it accessible and engaging
+- Active recall focus in all content
+- Show why this matters and how it connects`
 };
 
 // Simple fallback data when API fails
@@ -149,8 +210,24 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `Analyze this clinical image. Create a comprehensive study kit with 8 high-yield questions relevant to this field.`
-    : `Based on these notes: \n\n${content}\n\nGenerate a comprehensive study kit with 8 questions, a summary, and flashcards. Focus on the most important concepts.`;
+    ? `Analyze this clinical image and create an effective study guide with:
+1. A compelling "Big Picture Question" that frames the learning
+2. Key Concepts section (definitions and essential understanding)
+3. Comparison Table (if applicable) contrasting similar concepts
+4. "Test Yourself" section with 3-4 board-style self-test questions
+5. "Common Misconceptions" highlighting frequent mistakes
+6. A brief summary pulling it together
+
+Then provide 8 high-yield exam questions for the quiz and create 5-8 flashcard pairs.`
+    : `Based on these notes: \n\n${content}\n\nCreate an EFFECTIVE STUDY GUIDE with:
+1. A compelling "Big Picture Question" that frames the learning
+2. Key Concepts section (definitions and essential understanding - keep concise)
+3. Comparison Table (if contrasting concepts exist) comparing differential options
+4. "Test Yourself" section with 3-4 self-test questions (format like real exams)
+5. "Common Misconceptions" highlighting frequent student mistakes
+6. If relevant: Step-by-step reasoning or process explanations
+
+Then generate 8 high-yield exam questions for the quiz and create 5-8 flashcard pairs that test active recall.`;
 
   try {
     return await retryWithBackoff(async () => {
