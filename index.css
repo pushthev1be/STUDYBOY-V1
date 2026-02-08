@@ -44,3 +44,60 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  /* Larger touch targets for mobile */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Quiz options responsive sizing */
+  .quiz-option {
+    padding: 1rem;
+    min-height: 60px;
+    font-size: 0.875rem;
+  }
+
+  /* Flashcard sizing for mobile */
+  .flashcard-container {
+    width: 95vw;
+    max-width: 100%;
+    height: 50vh;
+    min-height: 300px;
+  }
+
+  /* Reduce padding on small screens */
+  .space-y-8 {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(1.5rem * var(--tw-space-y-reverse));
+  }
+
+  /* Optimize header spacing */
+  header {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  /* Better mobile text sizing */
+  h1 {
+    font-size: 1.875rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  /* Prevent text zoom on double-tap */
+  button, input, select, textarea {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Smoother scroll on mobile */
+  html {
+    scroll-behavior: smooth;
+  }
+}
