@@ -18,7 +18,8 @@ CONTENT PRINCIPLES:
 - Focus on PANCE board-style reasoning
 - Emphasize differential diagnosis and clinical decision-making
 - Connect pathophysiology to patient presentation
-- Highlight high-yield, commonly tested concepts`,
+- Highlight high-yield, commonly tested concepts
+- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`,
 
   'Nursing': `You are a Nursing Education Expert. YOUR ROLE: Generate structured study guides, not narrative essays.
 
@@ -34,7 +35,8 @@ CONTENT PRINCIPLES:
 - Focus on NCLEX-style nursing judgment
 - Emphasize patient safety and assessment findings
 - Connect clinical findings to nursing diagnoses
-- Organize by ADPIE framework where applicable`,
+- Organize by ADPIE framework where applicable
+- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`,
 
   'Medical': `You are a Medical School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
 
@@ -50,7 +52,8 @@ CONTENT PRINCIPLES:
 - Focus on deep pathophysiologic understanding
 - Emphasize mechanism over memorization
 - Connect all concepts to real patient scenarios
-- Highlight commonly tested board concepts`,
+- Highlight commonly tested board concepts
+- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`,
 
   'GenEd': `You are an expert educator. YOUR ROLE: Generate structured study guides, not narrative essays.
 
@@ -66,7 +69,8 @@ CONTENT PRINCIPLES:
 - Make content accessible and engaging
 - Show how concepts connect and relate
 - Include real-world examples
-- Encourage deep understanding and application`
+- Encourage deep understanding and application
+- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`
 };
 
 // Simple fallback data when API fails
@@ -213,7 +217,7 @@ Test Yourself:
 
 Common Misconception: [State misconception] --> [Correct understanding]
 
-Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 5-8 flashcard pairs.`
+Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and create 15 flashcard pairs.`
     : `CRITICAL: Format summary with CONTENT, not empty sections.
 
 Big Picture Question: [Clear question about the core concept]
@@ -237,7 +241,7 @@ Common Misconception: [State misconception] --> [Correct understanding]
 ANALYZE THESE NOTES:
 ${content}
 
-Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 5-8 flashcard pairs.`;
+Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 15 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
