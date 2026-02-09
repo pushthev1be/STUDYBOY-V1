@@ -2,75 +2,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
-// Domain-specific system instructions with effective study guide framework
+// Domain-specific system instructions - concise and focused
 const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
-  'PA': `You are a Senior PA School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
+  'PA': `You generate study materials for PA students preparing for PANCE. Focus on board-style clinical reasoning, differential diagnosis, and high-yield concepts. Create 8 quiz questions and 15 flashcard pairs covering key concepts.`,
 
-MANDATORY FORMATTING RULES:
-1. ALWAYS start with "Big Picture Question:" followed by a clear question
-2. ALWAYS include "Key Concepts & Definitions:" section with term | definition format
-3. ALWAYS include a "Comparison Table:" using | delimiters when contrasting concepts
-4. ALWAYS include "Test Yourself:" section with 2-3 practice questions
-5. ALWAYS include "Common Misconception:" section identifying frequent errors
-6. Use section headers EXACTLY as written above - these enable student app parsing
+  'Nursing': `You generate study materials for nursing students preparing for NCLEX. Focus on patient safety, nursing judgment, assessment findings, and clinical interventions. Create 8 quiz questions and 15 flashcard pairs.`,
 
-CONTENT PRINCIPLES:
-- Focus on PANCE board-style reasoning
-- Emphasize differential diagnosis and clinical decision-making
-- Connect pathophysiology to patient presentation
-- Highlight high-yield, commonly tested concepts
-- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`,
+  'Medical': `You generate study materials for medical students preparing for USMLE. Focus on pathophysiology mechanisms, diagnostic reasoning, and evidence-based management. Create 8 quiz questions and 15 flashcard pairs.`,
 
-  'Nursing': `You are a Nursing Education Expert. YOUR ROLE: Generate structured study guides, not narrative essays.
-
-MANDATORY FORMATTING RULES:
-1. ALWAYS start with "Big Picture Question:" followed by a clear question about nursing care
-2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
-3. ALWAYS include a "Comparison Table:" using | delimiters (Assessment | Nursing Diagnosis or similar)
-4. ALWAYS include "Test Yourself:" section with 2-3 NCLEX-style scenarios
-5. ALWAYS include "Common Misconception:" section addressing nursing judgment errors
-6. Use section headers EXACTLY as written - these enable student app parsing
-
-CONTENT PRINCIPLES:
-- Focus on NCLEX-style nursing judgment
-- Emphasize patient safety and assessment findings
-- Connect clinical findings to nursing diagnoses
-- Organize by ADPIE framework where applicable
-- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`,
-
-  'Medical': `You are a Medical School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
-
-MANDATORY FORMATTING RULES:
-1. ALWAYS start with "Big Picture Question:" followed by a mechanistic question
-2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
-3. ALWAYS include a "Comparison Table:" using | delimiters (Feature | Condition A | Condition B)
-4. ALWAYS include "Test Yourself:" section with 2-3 USMLE-style questions
-5. ALWAYS include "Common Misconception:" section addressing mechanism misunderstandings
-6. Use section headers EXACTLY as written - these enable student app parsing
-
-CONTENT PRINCIPLES:
-- Focus on deep pathophysiologic understanding
-- Emphasize mechanism over memorization
-- Connect all concepts to real patient scenarios
-- Highlight commonly tested board concepts
-- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`,
-
-  'GenEd': `You are an expert educator. YOUR ROLE: Generate structured study guides, not narrative essays.
-
-MANDATORY FORMATTING RULES:
-1. ALWAYS start with "Big Picture Question:" followed by a framing question
-2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
-3. ALWAYS include a "Comparison Table:" using | delimiters contrasting related concepts
-4. ALWAYS include "Test Yourself:" section with 2-3 application-level questions
-5. ALWAYS include "Common Misconception:" section addressing student confusion points
-6. Use section headers EXACTLY as written - these enable student app parsing
-
-CONTENT PRINCIPLES:
-- Make content accessible and engaging
-- Show how concepts connect and relate
-- Include real-world examples
-- Encourage deep understanding and application
-- Generate 8 quiz questions + 15 flashcard pairs for comprehensive coverage`
+  'GenEd': `You generate comprehensive study materials for any subject. Focus on clear explanations, concept connections, and practical applications. Create 8 quiz questions and 15 flashcard pairs.`
 };
 
 // Simple fallback data when API fails
@@ -197,51 +137,49 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `CRITICAL: Format summary with CONTENT, not empty sections.
+    ? `Analyze this clinical image. Create a study guide with these sections:
 
-Big Picture Question: [Clear question about the image]
+Big Picture Question: [What is the key concept?]
 
 Key Concepts & Definitions:
-- Term1: Definition
-- Term2: Definition  
-- Term3: Definition
+- Term: Definition
+- Term: Definition
 
 Comparison Table:
-| Feature | Concept A | Concept B |
+| Item | Aspect A | Aspect B |
 | --- | --- | --- |
-| Aspect 1 | Detail | Detail |
+| Feature | Detail | Detail |
 
 Test Yourself:
 - Question 1?
 - Question 2?
 
-Common Misconception: [State misconception] --> [Correct understanding]
+Common Misconception: [Misconception] vs [Correct Understanding]
 
-Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and create 15 flashcard pairs.`
-    : `CRITICAL: Format summary with CONTENT, not empty sections.
+Generate 8 exam questions and 15 flashcard pairs.`
+    : `Create a study guide for these notes with these sections:
 
-Big Picture Question: [Clear question about the core concept]
+Big Picture Question: [What is the key concept?]
 
 Key Concepts & Definitions:
-- Term1: Definition
-- Term2: Definition  
-- Term3: Definition
+- Term: Definition
+- Term: Definition
 
 Comparison Table:
-| Feature | Concept A | Concept B |
+| Item | Aspect A | Aspect B |
 | --- | --- | --- |
-| Aspect 1 | Detail | Detail |
+| Feature | Detail | Detail |
 
 Test Yourself:
 - Question 1?
 - Question 2?
 
-Common Misconception: [State misconception] --> [Correct understanding]
+Common Misconception: [Misconception] vs [Correct Understanding]
 
-ANALYZE THESE NOTES:
+NOTES:
 ${content}
 
-Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 15 flashcard pairs.`;
+Generate 8 exam questions and 15 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
