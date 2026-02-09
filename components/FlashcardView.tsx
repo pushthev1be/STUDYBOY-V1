@@ -88,7 +88,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
   const currentCard = cards[currentIndex];
 
   return (
-    <div className="flex flex-col items-center justify-center space-y-8 py-12 max-w-lg mx-auto">
+    <div className="flex flex-col items-center space-y-8 py-12 max-w-lg mx-auto min-h-full">
       <div className="text-slate-500 font-medium text-sm">
         Card {currentIndex + 1} of {displayedCards} {displayedCards < cards.length && `(${cards.length} total)`}
       </div>
