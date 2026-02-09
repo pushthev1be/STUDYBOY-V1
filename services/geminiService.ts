@@ -2,15 +2,71 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
-// Domain-specific system instructions - focused on detailed learning
+// Domain-specific system instructions with effective study guide framework
 const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
-  'PA': `Create comprehensive study materials for PA students preparing for PANCE boards. Focus on clinical reasoning, differential diagnosis, evidence-based management, and high-yield concepts. Provide detailed definitions, clinical correlations, and board-style reasoning. Generate comprehensive content that tests understanding, not just memorization.`,
+  'PA': `You are a Senior PA School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
 
-  'Nursing': `Create comprehensive study materials for nursing students preparing for NCLEX. Focus on patient safety, nursing judgment, assessment-diagnosis-intervention links, and clinical decision-making. Provide detailed explanations of nursing concepts, interventions with rationales, and NCLEX-style scenarios. Make content clinically practical and relevant.`,
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a clear question
+2. ALWAYS include "Key Concepts & Definitions:" section with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters when contrasting concepts
+4. ALWAYS include "Test Yourself:" section with 2-3 practice questions
+5. ALWAYS include "Common Misconception:" section identifying frequent errors
+6. Use section headers EXACTLY as written above - these enable student app parsing
 
-  'Medical': `Create comprehensive study materials for medical students preparing for USMLE. Focus on pathophysiology mechanisms, diagnostic reasoning, evidence-based management, and clinical application. Provide detailed mechanistic explanations, connect concepts to patient presentations, and emphasize board-style thinking. Make every concept clinically relevant.`,
+CONTENT PRINCIPLES:
+- Focus on PANCE board-style reasoning
+- Emphasize differential diagnosis and clinical decision-making
+- Connect pathophysiology to patient presentation
+- Highlight high-yield, commonly tested concepts`,
 
-  'GenEd': `Create comprehensive, well-organized study materials suitable for any subject area. Focus on clarity, concept connections, real-world applications, and deep understanding. Provide detailed explanations, practical examples, and help students see how concepts relate. Make content engaging and meaningful.`
+  'Nursing': `You are a Nursing Education Expert. YOUR ROLE: Generate structured study guides, not narrative essays.
+
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a clear question about nursing care
+2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters (Assessment | Nursing Diagnosis or similar)
+4. ALWAYS include "Test Yourself:" section with 2-3 NCLEX-style scenarios
+5. ALWAYS include "Common Misconception:" section addressing nursing judgment errors
+6. Use section headers EXACTLY as written - these enable student app parsing
+
+CONTENT PRINCIPLES:
+- Focus on NCLEX-style nursing judgment
+- Emphasize patient safety and assessment findings
+- Connect clinical findings to nursing diagnoses
+- Organize by ADPIE framework where applicable`,
+
+  'Medical': `You are a Medical School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
+
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a mechanistic question
+2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters (Feature | Condition A | Condition B)
+4. ALWAYS include "Test Yourself:" section with 2-3 USMLE-style questions
+5. ALWAYS include "Common Misconception:" section addressing mechanism misunderstandings
+6. Use section headers EXACTLY as written - these enable student app parsing
+
+CONTENT PRINCIPLES:
+- Focus on deep pathophysiologic understanding
+- Emphasize mechanism over memorization
+- Connect all concepts to real patient scenarios
+- Highlight commonly tested board concepts`,
+
+  'GenEd': `You are an expert educator. YOUR ROLE: Generate structured study guides, not narrative essays.
+
+MANDATORY FORMATTING RULES:
+1. ALWAYS start with "Big Picture Question:" followed by a framing question
+2. ALWAYS include "Key Concepts & Definitions:" with term | definition format
+3. ALWAYS include a "Comparison Table:" using | delimiters contrasting related concepts
+4. ALWAYS include "Test Yourself:" section with 2-3 application-level questions
+5. ALWAYS include "Common Misconception:" section addressing student confusion points
+6. Use section headers EXACTLY as written - these enable student app parsing
+
+CONTENT PRINCIPLES:
+- Make content accessible and engaging
+- Show how concepts connect and relate
+- Include real-world examples
+- Encourage deep understanding and application`
 };
 
 // Simple fallback data when API fails
@@ -137,53 +193,51 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `Analyze this clinical image and create a detailed study guide:
+    ? `CRITICAL: Format summary with CONTENT, not empty sections.
 
-Big Picture Question: [Insightful question about the core concept]
+Big Picture Question: [Clear question about the image]
 
 Key Concepts & Definitions:
-- Key term 1: Detailed definition
-- Key term 2: Detailed definition
-- Key term 3: Detailed definition
+- Term1: Definition
+- Term2: Definition  
+- Term3: Definition
 
 Comparison Table:
 | Feature | Concept A | Concept B |
 | --- | --- | --- |
-| Characteristic 1 | Description | Description |
-| Characteristic 2 | Description | Description |
+| Aspect 1 | Detail | Detail |
 
 Test Yourself:
-- Practice question 1 with context?
-- Practice question 2 with context?
+- Question 1?
+- Question 2?
 
-Common Misconception: [Explain frequent student error] --> [Provide correct understanding with reasoning]
+Common Misconception: [State misconception] --> [Correct understanding]
 
-Then generate 8 board-style exam questions and 15 comprehensive flashcard pairs covering all aspects of the topic.`
-    : `Create a detailed study guide for these notes:
+Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 5-8 flashcard pairs.`
+    : `CRITICAL: Format summary with CONTENT, not empty sections.
 
-Big Picture Question: [Frame the most important conceptual question about this topic]
+Big Picture Question: [Clear question about the core concept]
 
 Key Concepts & Definitions:
-- Key term 1: Detailed definition with clinical relevance
-- Key term 2: Detailed definition with clinical relevance
-- Key term 3: Detailed definition with clinical relevance
+- Term1: Definition
+- Term2: Definition  
+- Term3: Definition
 
 Comparison Table:
 | Feature | Concept A | Concept B |
 | --- | --- | --- |
-| Key characteristic 1 | Detailed comparison | Detailed comparison |
-| Key characteristic 2 | Detailed comparison | Detailed comparison |
+| Aspect 1 | Detail | Detail |
 
 Test Yourself:
-- Application question 1 testing understanding?
-- Application question 2 testing understanding?
+- Question 1?
+- Question 2?
 
-Common Misconception: [Explain common student misconception or error] --> [Provide correct understanding with explanation]
+Common Misconception: [State misconception] --> [Correct understanding]
 
-NOTES TO STUDY:
+ANALYZE THESE NOTES:
 ${content}
 
-Generate 8 board-style exam questions with detailed explanations and create 15 comprehensive flashcard pairs that test understanding and application.`;
+Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 5-8 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
