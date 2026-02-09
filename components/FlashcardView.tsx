@@ -53,12 +53,13 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
   };
 
   const loadMore = async () => {
-    if (!topic || isLoadingMore) return;
+    if (isLoadingMore) return;
     
     setIsLoadingMore(true);
     try {
       const { generateAdditionalFlashcards } = await import('../services/geminiService');
-      const newCards = await generateAdditionalFlashcards(topic);
+      const cardTopic = topic || 'Study Material';
+      const newCards = await generateAdditionalFlashcards(cardTopic);
       if (newCards.length > 0 && onLoadMore) {
         onLoadMore(newCards);
       }
