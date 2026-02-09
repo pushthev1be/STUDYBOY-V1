@@ -213,7 +213,7 @@ Test Yourself:
 
 Common Misconception: [State misconception] --> [Correct understanding]
 
-Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 5-8 flashcard pairs.`
+Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 10-12 flashcard pairs.`
     : `CRITICAL: Format summary with CONTENT, not empty sections.
 
 Big Picture Question: [Clear question about the core concept]
@@ -237,7 +237,7 @@ Common Misconception: [State misconception] --> [Correct understanding]
 ANALYZE THESE NOTES:
 ${content}
 
-Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 5-8 flashcard pairs.`;
+Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 10-12 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
