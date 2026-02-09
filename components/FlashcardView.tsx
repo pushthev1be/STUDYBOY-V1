@@ -179,16 +179,14 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
         </button>
       </div>
 
-      {topic && (
-        <button
-          onClick={loadMore}
-          disabled={isLoadingMore}
-          className="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-        >
-          <ChevronDown size={20} />
-          {isLoadingMore ? 'Generating more...' : 'Load More Flashcards'}
-        </button>
-      )}
+      <button
+        onClick={loadMore}
+        disabled={isLoadingMore}
+        className="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+      >
+        <ChevronDown size={20} />
+        {isLoadingMore ? 'Generating more...' : 'Load More Flashcards'}
+      </button>
     </div>
   );
 };
