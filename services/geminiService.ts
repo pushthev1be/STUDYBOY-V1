@@ -350,3 +350,38 @@ Return only the JSON array with 2 questions.`;
     return FALLBACK_QUIZ.slice(0, 2);
   }
 }
+
+export async function generateAdditionalFlashcards(topic: string): Promise<any[]> {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const model = 'gemini-3-flash-preview';
+
+  const prompt = `Generate 8-10 flashcard pairs about: "${topic}"
+  
+Format as JSON array with:
+[
+  { "question": "...", "answer": "..." },
+  { "question": "...", "answer": "..." }
+]
+
+Cover different aspects and difficulty levels. Be concise but complete.`;
+
+  try {
+    return await retryWithBackoff(async () => {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          thinkingConfig: { thinkingBudget: 0 }
+        },
+      });
+
+      const result = JSON.parse(response.text || '[]');
+      return Array.isArray(result) ? result : [];
+    });
+  } catch (error) {
+    console.error("Generate Additional Flashcards Error:", error);
+    return [];
+  }
+}

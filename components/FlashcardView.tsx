@@ -5,17 +5,20 @@ import { ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from 'lucide-react'
 
 interface FlashcardViewProps {
   cards: Flashcard[];
+  topic?: string;
   onCardViewed?: () => void;
   onCardRated?: (cardIndex: number, quality: number) => void;
+  onLoadMore?: (newCards: Flashcard[]) => void;
 }
 
 const FLASHCARDS_PER_LOAD = 15;
 
-export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewed, onCardRated }) => {
+export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCardViewed, onCardRated, onLoadMore }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [viewedIndices, setViewedIndices] = useState<Set<number>>(new Set([0]));
   const [displayedCards, setDisplayedCards] = useState(Math.min(FLASHCARDS_PER_LOAD, cards.length));
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const markAsViewed = (index: number) => {
     if (!viewedIndices.has(index)) {
@@ -49,9 +52,21 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
     }, 150);
   };
 
-  const loadMore = () => {
-    const newCount = Math.min(displayedCards + FLASHCARDS_PER_LOAD, cards.length);
-    setDisplayedCards(newCount);
+  const loadMore = async () => {
+    if (!topic || isLoadingMore) return;
+    
+    setIsLoadingMore(true);
+    try {
+      const { generateAdditionalFlashcards } = await import('../services/geminiService');
+      const newCards = await generateAdditionalFlashcards(topic);
+      if (newCards.length > 0 && onLoadMore) {
+        onLoadMore(newCards);
+      }
+    } catch (error) {
+      console.error("Failed to load more flashcards:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
   // Keyboard navigation
@@ -164,13 +179,14 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, onCardViewe
         </button>
       </div>
 
-      {displayedCards < cards.length && (
+      {topic && (
         <button
           onClick={loadMore}
-          className="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+          disabled={isLoadingMore}
+          className="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
         >
           <ChevronDown size={20} />
-          Load More Flashcards
+          {isLoadingMore ? 'Generating more...' : 'Load More Flashcards'}
         </button>
       )}
     </div>

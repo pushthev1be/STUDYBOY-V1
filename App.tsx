@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope } from 'lucide-react';
 import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain } from './types';
-import { processStudyContent, extendQuiz, generateQuestionForFailure } from './services/geminiService';
+import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
 import { QuizView } from './components/QuizView';
@@ -358,7 +358,8 @@ const App: React.FC = () => {
     switch (viewMode) {
       case 'summary': return <SummaryView summary={material.summary} title={material.title} contentCoveragePercent={material.contentCoveragePercent} hasUnprocessedContent={!!material.unprocessedContent} />;
       case 'flashcards': return <FlashcardView 
-          cards={material.flashcards} 
+          cards={material.flashcards}
+          topic={material.title}
           onCardViewed={() => updateProgress('flashcard')}
           onCardRated={(cardIndex, quality) => {
             const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
@@ -369,6 +370,12 @@ const App: React.FC = () => {
                   ? { ...card, ...updated }
                   : card
               )
+            });
+          }}
+          onLoadMore={(newCards) => {
+            setMaterial({
+              ...material,
+              flashcards: [...material.flashcards, ...newCards]
             });
           }}
         />;
