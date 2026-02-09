@@ -2,15 +2,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
-// Domain-specific system instructions - concise and focused
+// Domain-specific system instructions - focused on detailed learning
 const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
-  'PA': `You generate study materials for PA students preparing for PANCE. Focus on board-style clinical reasoning, differential diagnosis, and high-yield concepts. Create 8 quiz questions and 15 flashcard pairs covering key concepts.`,
+  'PA': `Create comprehensive study materials for PA students preparing for PANCE boards. Focus on clinical reasoning, differential diagnosis, evidence-based management, and high-yield concepts. Provide detailed definitions, clinical correlations, and board-style reasoning. Generate comprehensive content that tests understanding, not just memorization.`,
 
-  'Nursing': `You generate study materials for nursing students preparing for NCLEX. Focus on patient safety, nursing judgment, assessment findings, and clinical interventions. Create 8 quiz questions and 15 flashcard pairs.`,
+  'Nursing': `Create comprehensive study materials for nursing students preparing for NCLEX. Focus on patient safety, nursing judgment, assessment-diagnosis-intervention links, and clinical decision-making. Provide detailed explanations of nursing concepts, interventions with rationales, and NCLEX-style scenarios. Make content clinically practical and relevant.`,
 
-  'Medical': `You generate study materials for medical students preparing for USMLE. Focus on pathophysiology mechanisms, diagnostic reasoning, and evidence-based management. Create 8 quiz questions and 15 flashcard pairs.`,
+  'Medical': `Create comprehensive study materials for medical students preparing for USMLE. Focus on pathophysiology mechanisms, diagnostic reasoning, evidence-based management, and clinical application. Provide detailed mechanistic explanations, connect concepts to patient presentations, and emphasize board-style thinking. Make every concept clinically relevant.`,
 
-  'GenEd': `You generate comprehensive study materials for any subject. Focus on clear explanations, concept connections, and practical applications. Create 8 quiz questions and 15 flashcard pairs.`
+  'GenEd': `Create comprehensive, well-organized study materials suitable for any subject area. Focus on clarity, concept connections, real-world applications, and deep understanding. Provide detailed explanations, practical examples, and help students see how concepts relate. Make content engaging and meaningful.`
 };
 
 // Simple fallback data when API fails
@@ -137,49 +137,53 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `Analyze this clinical image. Create a study guide with these sections:
+    ? `Analyze this clinical image and create a detailed study guide:
 
-Big Picture Question: [What is the key concept?]
-
-Key Concepts & Definitions:
-- Term: Definition
-- Term: Definition
-
-Comparison Table:
-| Item | Aspect A | Aspect B |
-| --- | --- | --- |
-| Feature | Detail | Detail |
-
-Test Yourself:
-- Question 1?
-- Question 2?
-
-Common Misconception: [Misconception] vs [Correct Understanding]
-
-Generate 8 exam questions and 15 flashcard pairs.`
-    : `Create a study guide for these notes with these sections:
-
-Big Picture Question: [What is the key concept?]
+Big Picture Question: [Insightful question about the core concept]
 
 Key Concepts & Definitions:
-- Term: Definition
-- Term: Definition
+- Key term 1: Detailed definition
+- Key term 2: Detailed definition
+- Key term 3: Detailed definition
 
 Comparison Table:
-| Item | Aspect A | Aspect B |
+| Feature | Concept A | Concept B |
 | --- | --- | --- |
-| Feature | Detail | Detail |
+| Characteristic 1 | Description | Description |
+| Characteristic 2 | Description | Description |
 
 Test Yourself:
-- Question 1?
-- Question 2?
+- Practice question 1 with context?
+- Practice question 2 with context?
 
-Common Misconception: [Misconception] vs [Correct Understanding]
+Common Misconception: [Explain frequent student error] --> [Provide correct understanding with reasoning]
 
-NOTES:
+Then generate 8 board-style exam questions and 15 comprehensive flashcard pairs covering all aspects of the topic.`
+    : `Create a detailed study guide for these notes:
+
+Big Picture Question: [Frame the most important conceptual question about this topic]
+
+Key Concepts & Definitions:
+- Key term 1: Detailed definition with clinical relevance
+- Key term 2: Detailed definition with clinical relevance
+- Key term 3: Detailed definition with clinical relevance
+
+Comparison Table:
+| Feature | Concept A | Concept B |
+| --- | --- | --- |
+| Key characteristic 1 | Detailed comparison | Detailed comparison |
+| Key characteristic 2 | Detailed comparison | Detailed comparison |
+
+Test Yourself:
+- Application question 1 testing understanding?
+- Application question 2 testing understanding?
+
+Common Misconception: [Explain common student misconception or error] --> [Provide correct understanding with explanation]
+
+NOTES TO STUDY:
 ${content}
 
-Generate 8 exam questions and 15 flashcard pairs.`;
+Generate 8 board-style exam questions with detailed explanations and create 15 comprehensive flashcard pairs that test understanding and application.`;
 
   try {
     return await retryWithBackoff(async () => {
