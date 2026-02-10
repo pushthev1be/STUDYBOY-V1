@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
 // Domain-specific system instructions with effective study guide framework
@@ -195,51 +195,25 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   const prompt = isImage 
-    ? `CRITICAL: Format summary with CONTENT, not empty sections.
+    ? `Analyze this clinical image. Generate a structured study guide with:
+- Big Picture Question
+- Key Concepts & Definitions (term | definition)
+- Comparison Table (| delimiters)
+- Test Yourself (2-3 questions)
+- Common Misconception
 
-Big Picture Question: [Clear question about the image]
+Also generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology") and 15 flashcard pairs.`
+    : `Analyze these notes and generate a structured study guide with:
+- Big Picture Question
+- Key Concepts & Definitions (term | definition)
+- Comparison Table (| delimiters)
+- Test Yourself (2-3 questions)
+- Common Misconception
 
-Key Concepts & Definitions:
-- Term1: Definition
-- Term2: Definition  
-- Term3: Definition
-
-Comparison Table:
-| Feature | Concept A | Concept B |
-| --- | --- | --- |
-| Aspect 1 | Detail | Detail |
-
-Test Yourself:
-- Question 1?
-- Question 2?
-
-Common Misconception: [State misconception] --> [Correct understanding]
-
-Analyze this clinical image with CONTENT in each section. Generate 15 exam questions (each with a "subtopic" field grouping it under a clear subtopic heading) and 15 flashcard pairs.`
-    : `CRITICAL: Format summary with CONTENT, not empty sections.
-
-Big Picture Question: [Clear question about the core concept]
-
-Key Concepts & Definitions:
-- Term1: Definition
-- Term2: Definition  
-- Term3: Definition
-
-Comparison Table:
-| Feature | Concept A | Concept B |
-| --- | --- | --- |
-| Aspect 1 | Detail | Detail |
-
-Test Yourself:
-- Question 1?
-- Question 2?
-
-Common Misconception: [State misconception] --> [Correct understanding]
-
-ANALYZE THESE NOTES:
+NOTES:
 ${content}
 
-Format with ACTUAL CONTENT in each section above (not empty). Generate 15 exam questions (each with a "subtopic" field grouping it under a clear subtopic heading like "Pathophysiology", "Pharmacology", "Diagnosis", etc.) and create 15 flashcard pairs.`;
+Generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology", "Pharmacology", "Diagnosis") and 15 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -252,7 +226,8 @@ Format with ACTUAL CONTENT in each section above (not empty). Generate 15 exam q
           systemInstruction: systemInstruction,
           responseMimeType: "application/json",
           responseSchema: STUDY_MATERIAL_SCHEMA,
-          thinkingConfig: { thinkingBudget: 0 }
+          maxOutputTokens: 8000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
 
@@ -262,7 +237,6 @@ Format with ACTUAL CONTENT in each section above (not empty). Generate 15 exam q
     });
   } catch (error) {
     console.error("Gemini API Error:", error);
-    // Return fallback instead of throwing
     return FALLBACK_STUDY_MATERIAL;
   }
 }
@@ -271,23 +245,7 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
 
-  const prompt = `SPACED REPETITION MODE: Student is reviewing "${currentTopic}" to strengthen long-term memory.
-
-GENERATE 5 NEW questions that:
-1. Test DIFFERENT ASPECTS than previous questions (avoid repetition)
-2. Use VARIED SCENARIOS: different patient ages, presentations, complications
-3. Mix DIFFICULTY LEVELS: 2 easier recall, 2 intermediate, 1 advanced application
-4. INTERLEAVE related concepts: require distinguishing between similar ideas
-5. TARGET MISCONCEPTIONS: include edge cases and common board exam errors
-6. Each question MUST include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology", "Diagnosis")
-
-Each question must have:
-- A realistic clinical vignette
-- Clear correct answer with strong reasoning
-- Plausible distractors that test misconceptions
-- Explanation that reinforces learning
-
-Return only the JSON array of questions.`;
+  const prompt = `Generate 5 new board-style questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology"). Vary difficulty and scenarios. Include clinical vignettes, plausible distractors, and concise explanations.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -298,7 +256,8 @@ Return only the JSON array of questions.`;
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-          thinkingConfig: { thinkingBudget: 0 }
+          maxOutputTokens: 4000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
 
@@ -306,7 +265,6 @@ Return only the JSON array of questions.`;
     });
   } catch (error) {
     console.error("Gemini Extension Error:", error);
-    // Return fallback questions instead of empty array
     return FALLBACK_QUIZ;
   }
 }
@@ -315,22 +273,7 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
 
-  const prompt = `REMEDIATION MODE: Student got a question wrong about "${currentTopic}". Generate targeted learning questions.
-
-GENERATE 2 STRATEGIC questions that:
-1. TARGET THE MISCONCEPTION: Help student understand what went wrong
-2. DEEPEN UNDERSTANDING: Explain WHY the correct answer is right
-3. VARY THE SCENARIO: Different patient presentations of the same concept
-4. TEST APPLICATION: Apply concept in new contexts
-5. COMPARE & CONTRAST: Link to similar concepts to prevent future confusion
-
-Each question must:
-- Directly address the struggling concept
-- Approach from a different angle than the original
-- Have detailed explanations that clarify misconceptions
-- Include clinical reasoning for long-term retention
-
-Return only the JSON array with 2 questions.`;
+  const prompt = `Student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different angles. Include a "subtopic" field, clinical vignettes, and explanations that clarify the misconception.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -341,7 +284,8 @@ Return only the JSON array with 2 questions.`;
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-          thinkingConfig: { thinkingBudget: 0 }
+          maxOutputTokens: 2000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
 
@@ -349,7 +293,6 @@ Return only the JSON array with 2 questions.`;
     });
   } catch (error) {
     console.error("Generate Question for Failure Error:", error);
-    // Return fallback instead of empty array
     return FALLBACK_QUIZ.slice(0, 2);
   }
 }
@@ -358,15 +301,7 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
 
-  const prompt = `Generate 15 flashcard pairs about: "${topic}"
-  
-Format as JSON array with:
-[
-  { "question": "...", "answer": "..." },
-  { "question": "...", "answer": "..." }
-]
-
-Cover different aspects and difficulty levels. Be concise but complete.`;
+  const prompt = `Generate 15 flashcard pairs about: "${topic}". Cover different aspects and difficulty levels. Be concise.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -376,7 +311,8 @@ Cover different aspects and difficulty levels. Be concise but complete.`;
         config: {
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
-          thinkingConfig: { thinkingBudget: 0 }
+          maxOutputTokens: 4000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
 
