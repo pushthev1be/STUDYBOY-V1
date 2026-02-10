@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope } from 'lucide-react';
-import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain } from './types';
+import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession } from './types';
 import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
@@ -92,6 +92,7 @@ const App: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
   const [goals, setGoals] = useState<StudyGoal[]>(INITIAL_GOALS);
   const [showNotification, setShowNotification] = useState<string | null>(null);
+  const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
 
   useEffect(() => {
     let interval: number;
@@ -124,6 +125,8 @@ const App: React.FC = () => {
         setGoals(g);
       }
     }
+    const savedSessions = localStorage.getItem('sg_quiz_sessions');
+    if (savedSessions) setQuizSessions(JSON.parse(savedSessions));
   }, []);
 
   useEffect(() => {
@@ -131,7 +134,8 @@ const App: React.FC = () => {
     localStorage.setItem('sg_stats', JSON.stringify({ ...stats, lastActive: new Date().toISOString() }));
     localStorage.setItem('sg_achievements', JSON.stringify(achievements));
     localStorage.setItem('sg_goals', JSON.stringify(goals));
-  }, [user, stats, achievements, goals]);
+    localStorage.setItem('sg_quiz_sessions', JSON.stringify(quizSessions));
+  }, [user, stats, achievements, goals, quizSessions]);
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -381,10 +385,21 @@ const App: React.FC = () => {
         />;
       case 'quiz': return <QuizView 
           questions={material.quiz} 
-          onQuizComplete={(score, total) => updateProgress('quiz', { perfect: score === total })} 
+          onQuizComplete={(score, total) => {
+            updateProgress('quiz', { perfect: score === total });
+            const session: QuizSession = {
+              id: Date.now().toString(),
+              topic: material.title,
+              score,
+              total,
+              date: new Date().toISOString()
+            };
+            setQuizSessions(prev => [session, ...prev].slice(0, 50));
+          }}
           onKeepGoing={handleKeepGoing}
           onQuestionFailed={handleQuestionFailed}
           isExtending={isExtending}
+          pastSessions={quizSessions}
         />;
       default: return null;
     }

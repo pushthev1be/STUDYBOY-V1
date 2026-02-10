@@ -2,7 +2,16 @@
 
 All notable changes to StudyGenius AI are documented here.
 
-## [2025-02-10] Fix Render build failure + architecture hardening
+## [2026-02-10] Quiz improvements: more questions, subtopics, session history
+
+- **Increased** base quiz question count from 8 to 15 for richer practice sessions
+- **Increased** "Extend Case Study" from 3 to 5 new questions per request
+- **Added** subtopic field to quiz questions — questions are now grouped under clear subtopic headings (e.g. Pathophysiology, Pharmacology, Diagnosis)
+- **Added** past quiz session history — completed sessions are saved to localStorage and displayed in a collapsible panel with score, date, and topic
+- **Updated** AI prompts and JSON schemas to include subtopic in all question generation paths
+- **Files changed**: `types.ts`, `services/geminiService.ts`, `components/QuizView.tsx`, `App.tsx`
+
+## [2026-02-10] Fix Render build failure + architecture hardening
 
 - **Removed** `temp_old_service.ts` - corrupted UTF-16 backup of `geminiService.ts` with broken `../types` import that caused `tsc` to fail during `tsc && vite build`
 - **Updated** `tsconfig.json` - added `exclude` for `node_modules` and `dist` to prevent stray files from breaking the TypeScript build
