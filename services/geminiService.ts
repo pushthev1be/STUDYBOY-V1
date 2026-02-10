@@ -213,7 +213,7 @@ Test Yourself:
 
 Common Misconception: [State misconception] --> [Correct understanding]
 
-Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 10-12 flashcard pairs.`
+Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 15 flashcard pairs.`
     : `CRITICAL: Format summary with CONTENT, not empty sections.
 
 Big Picture Question: [Clear question about the core concept]
@@ -237,7 +237,7 @@ Common Misconception: [State misconception] --> [Correct understanding]
 ANALYZE THESE NOTES:
 ${content}
 
-Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 10-12 flashcard pairs.`;
+Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 15 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -355,7 +355,7 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
 
-  const prompt = `Generate 8-10 flashcard pairs about: "${topic}"
+  const prompt = `Generate 15 flashcard pairs about: "${topic}"
   
 Format as JSON array with:
 [

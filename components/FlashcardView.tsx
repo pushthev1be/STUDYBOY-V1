@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Flashcard } from '../types';
 import { ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from 'lucide-react';
 
@@ -11,14 +11,13 @@ interface FlashcardViewProps {
   onLoadMore?: (newCards: Flashcard[]) => void;
 }
 
-const FLASHCARDS_PER_LOAD = 15;
-
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCardViewed, onCardRated, onLoadMore }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [viewedIndices, setViewedIndices] = useState<Set<number>>(new Set([0]));
-  const [displayedCards, setDisplayedCards] = useState(Math.min(FLASHCARDS_PER_LOAD, cards.length));
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const displayedCards = cards.length;
 
   const markAsViewed = (index: number) => {
     if (!viewedIndices.has(index)) {
@@ -31,12 +30,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
 
   const nextCard = () => {
     setIsFlipped(false);
-    let nextIdx = currentIndex + 1;
-    // If at end of displayed cards and more cards exist, don't wrap
-    if (nextIdx >= displayedCards && displayedCards < cards.length) {
-      return;
-    }
-    nextIdx = nextIdx % displayedCards;
+    const nextIdx = (currentIndex + 1) % displayedCards;
     setTimeout(() => {
       setCurrentIndex(nextIdx);
       markAsViewed(nextIdx);
@@ -70,8 +64,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
     }
   };
 
-  // Keyboard navigation
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') nextCard();
       if (e.key === 'ArrowLeft') prevCard();
@@ -90,7 +83,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
   return (
     <div className="flex flex-col items-center space-y-8 py-12 max-w-lg mx-auto min-h-full">
       <div className="text-slate-500 font-medium text-sm">
-        Card {currentIndex + 1} of {displayedCards} {displayedCards < cards.length && `(${cards.length} total)`}
+        Card {currentIndex + 1} of {cards.length}
       </div>
 
       <div 
