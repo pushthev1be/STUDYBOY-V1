@@ -122,9 +122,10 @@ const STUDY_MATERIAL_SCHEMA = {
             items: { type: Type.STRING }
           },
           correctAnswer: { type: Type.INTEGER },
-          explanation: { type: Type.STRING }
+          explanation: { type: Type.STRING },
+          subtopic: { type: Type.STRING, description: "Short subtopic heading for grouping (e.g. Pathophysiology, Pharmacology)" }
         },
-        required: ["question", "options", "correctAnswer", "explanation"]
+        required: ["question", "options", "correctAnswer", "explanation", "subtopic"]
       }
     }
   },
@@ -142,9 +143,10 @@ const ADDITIONAL_QUESTIONS_SCHEMA = {
         items: { type: Type.STRING }
       },
       correctAnswer: { type: Type.INTEGER },
-      explanation: { type: Type.STRING }
+      explanation: { type: Type.STRING },
+      subtopic: { type: Type.STRING, description: "Short subtopic heading for grouping" }
     },
-    required: ["question", "options", "correctAnswer", "explanation"]
+    required: ["question", "options", "correctAnswer", "explanation", "subtopic"]
   }
 };
 
@@ -213,7 +215,7 @@ Test Yourself:
 
 Common Misconception: [State misconception] --> [Correct understanding]
 
-Analyze this clinical image with CONTENT in each section. Generate 8 exam questions and 15 flashcard pairs.`
+Analyze this clinical image with CONTENT in each section. Generate 15 exam questions (each with a "subtopic" field grouping it under a clear subtopic heading) and 15 flashcard pairs.`
     : `CRITICAL: Format summary with CONTENT, not empty sections.
 
 Big Picture Question: [Clear question about the core concept]
@@ -237,7 +239,7 @@ Common Misconception: [State misconception] --> [Correct understanding]
 ANALYZE THESE NOTES:
 ${content}
 
-Format with ACTUAL CONTENT in each section above (not empty). Generate 8 exam questions and create 15 flashcard pairs.`;
+Format with ACTUAL CONTENT in each section above (not empty). Generate 15 exam questions (each with a "subtopic" field grouping it under a clear subtopic heading like "Pathophysiology", "Pharmacology", "Diagnosis", etc.) and create 15 flashcard pairs.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -271,12 +273,13 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
 
   const prompt = `SPACED REPETITION MODE: Student is reviewing "${currentTopic}" to strengthen long-term memory.
 
-GENERATE 3 NEW questions that:
+GENERATE 5 NEW questions that:
 1. Test DIFFERENT ASPECTS than previous questions (avoid repetition)
 2. Use VARIED SCENARIOS: different patient ages, presentations, complications
-3. Mix DIFFICULTY LEVELS: 1 easier recall, 1 intermediate, 1 advanced application
+3. Mix DIFFICULTY LEVELS: 2 easier recall, 2 intermediate, 1 advanced application
 4. INTERLEAVE related concepts: require distinguishing between similar ideas
 5. TARGET MISCONCEPTIONS: include edge cases and common board exam errors
+6. Each question MUST include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology", "Diagnosis")
 
 Each question must have:
 - A realistic clinical vignette

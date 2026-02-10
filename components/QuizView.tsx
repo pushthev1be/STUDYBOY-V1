@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { QuizQuestion, QuestionStatus } from '../types';
+import { QuizQuestion, QuestionStatus, QuizSession } from '../types';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -11,7 +11,10 @@ import {
   Sparkles,
   PlusCircle,
   Loader2,
-  Stethoscope
+  Stethoscope,
+  History,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface QuizViewProps {
@@ -20,6 +23,7 @@ interface QuizViewProps {
   onKeepGoing?: () => Promise<void>;
   onQuestionFailed?: () => Promise<void>;
   isExtending?: boolean;
+  pastSessions?: QuizSession[];
 }
 
 export const QuizView: React.FC<QuizViewProps> = ({ 
@@ -27,10 +31,12 @@ export const QuizView: React.FC<QuizViewProps> = ({
   onQuizComplete, 
   onKeepGoing,
   onQuestionFailed,
-  isExtending = false 
+  isExtending = false,
+  pastSessions = []
 }) => {
   const [sessionStates, setSessionStates] = useState<QuestionStatus[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Initialize and sync states when questions array grows
   useEffect(() => {
@@ -178,13 +184,59 @@ export const QuizView: React.FC<QuizViewProps> = ({
         </div>
       </div>
 
-      <div className="space-y-6">
-        {questions.map((q, qIdx) => {
-          const status = sessionStates[qIdx];
-          if (!status) return null;
+      {pastSessions.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <History className="text-indigo-500" size={20} />
+              <span className="font-bold text-slate-700">Past Quiz Sessions</span>
+              <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{pastSessions.length}</span>
+            </div>
+            {showHistory ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+          </button>
+          {showHistory && (
+            <div className="border-t border-slate-100 divide-y divide-slate-100">
+              {pastSessions.map((session) => (
+                <div key={session.id} className="px-5 py-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-700 text-sm">{session.topic}</p>
+                    <p className="text-xs text-slate-400">{new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-lg font-bold ${session.score === session.total ? 'text-emerald-600' : session.score / session.total >= 0.7 ? 'text-indigo-600' : 'text-amber-600'}`}>
+                      {Math.round((session.score / session.total) * 100)}%
+                    </span>
+                    <p className="text-xs text-slate-400">{session.score}/{session.total} correct</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-          return (
-            <div key={qIdx} className={`bg-white rounded-3xl border transition-all p-8 relative ${status.isAnswered ? 'border-slate-100 shadow-sm' : 'border-slate-200 shadow-md'}`}>
+      <div className="space-y-6">
+        {(() => {
+          let lastSubtopic = '';
+          return questions.map((q, qIdx) => {
+            const status = sessionStates[qIdx];
+            if (!status) return null;
+            const subtopicHeader = q.subtopic && q.subtopic !== lastSubtopic;
+            if (q.subtopic) lastSubtopic = q.subtopic;
+
+            return (
+              <React.Fragment key={qIdx}>
+                {subtopicHeader && (
+                  <div className="flex items-center gap-3 pt-4">
+                    <div className="h-px flex-1 bg-indigo-100"></div>
+                    <span className="text-xs font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-4 py-1.5 rounded-full">{q.subtopic}</span>
+                    <div className="h-px flex-1 bg-indigo-100"></div>
+                  </div>
+                )}
+                <div className={`bg-white rounded-3xl border transition-all p-8 relative ${status.isAnswered ? 'border-slate-100 shadow-sm' : 'border-slate-200 shadow-md'}`}>
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-4">
                   <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${status.isAnswered ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
@@ -252,9 +304,11 @@ export const QuizView: React.FC<QuizViewProps> = ({
                   </div>
                 </div>
               )}
-            </div>
-          );
-        })}
+                </div>
+              </React.Fragment>
+            );
+          });
+        })()}
 
         {isExtending && (
           <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 flex flex-col items-center justify-center text-center animate-pulse">

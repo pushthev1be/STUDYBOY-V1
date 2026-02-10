@@ -18,6 +18,7 @@ export interface QuizQuestion {
   options: string[];
   correctAnswer: number;
   explanation: string;
+  subtopic?: string;
 }
 
 export interface StudyMaterial {
@@ -76,6 +77,14 @@ export enum AppState {
 export type StudyDomain = 'PA' | 'Nursing' | 'Medical' | 'GenEd';
 
 export type ViewMode = 'summary' | 'flashcards' | 'quiz' | 'stats';
+
+export interface QuizSession {
+  id: string;
+  topic: string;
+  score: number;
+  total: number;
+  date: string;
+}
 
 export interface ProcessingState {
   totalContent: string;
