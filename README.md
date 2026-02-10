@@ -25,5 +25,8 @@ npm install
 npm run dev
 ```
 
+## Dummy Test
+This is a dummy change to verify repo access and PR creation.
+
 ## How it Works
 The build process uses Vite to bundle your TypeScript and React code into optimized HTML/JS/CSS. During the build, Render's environment variable `API_KEY` is injected into the application code so the AI features work immediately upon deployment.
