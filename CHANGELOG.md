@@ -2,6 +2,13 @@
 
 All notable changes to StudyGenius AI are documented here.
 
+## [2026-02-10] API response time optimization
+
+- **Fixed** thinking config for Gemini 3 — switched from `thinkingBudget: 0` (Gemini 2.5 param) to `thinkingLevel: "MINIMAL"` which is the correct Gemini 3 parameter; can reduce response time 30-70%
+- **Added** `maxOutputTokens` caps to all API calls — 8000 for initial generation, 4000 for extend quiz/flashcards, 2000 for remediation questions; prevents runaway generation
+- **Trimmed** prompt verbosity across all API calls — shorter prompts mean faster processing and fewer input tokens
+- **Files changed**: `services/geminiService.ts`
+
 ## [2026-02-10] Quiz improvements: more questions, subtopics, session history
 
 - **Increased** base quiz question count from 8 to 15 for richer practice sessions
