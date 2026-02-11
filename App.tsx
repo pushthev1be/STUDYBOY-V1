@@ -511,7 +511,7 @@ const App: React.FC = () => {
           setActiveUploadId(session.uploadId || null);
           setQuizResetKey(Date.now().toString());
         }}
-        resetKey={quizResetKey}
+        key={quizResetKey}
       />;
       default: return null;
     }

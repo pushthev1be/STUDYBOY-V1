@@ -28,7 +28,6 @@ interface QuizViewProps {
   savedUploads?: SavedUpload[];
   onReattemptSession?: (session: QuizSession) => void;
   onOpenUpload?: (upload: SavedUpload) => void;
-  resetKey?: string;
 }
 
 export const QuizView: React.FC<QuizViewProps> = ({
@@ -41,7 +40,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
   savedUploads = [],
   onReattemptSession,
   onOpenUpload,
-  resetKey
 }) => {
   const safeQuestions = Array.isArray(questions) ? questions : [];
   const [sessionStates, setSessionStates] = useState<QuestionStatus[]>([]);
@@ -66,20 +64,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
       return newStates;
     });
   }, [safeQuestions]);
-
-  useEffect(() => {
-    if (!resetKey) return;
-    setSessionStates(safeQuestions.map((_, i) => ({
-      id: i,
-      isAnswered: false,
-      isCorrect: null,
-      selectedOption: null,
-      isFlagged: false,
-      showExplanation: false,
-    })));
-    setIsSubmitted(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey]);
 
   const stats = useMemo(() => {
     const answered = sessionStates.filter(s => s.isAnswered).length;
