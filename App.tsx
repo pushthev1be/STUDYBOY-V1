@@ -232,6 +232,9 @@ const App: React.FC = () => {
     try {
       const isImage = file.type.startsWith('image/');
       const isPDF = file.type === 'application/pdf';
+
+      const isMarkdown = file.name.endsWith('.md') || file.type === 'text/markdown';
+
       let content = '';
       let sourceText: string | undefined;
       let sourceDataUrl: string | undefined;
@@ -250,6 +253,11 @@ const App: React.FC = () => {
         content = await extractTextFromPDF(file);
         sourceText = content;
         sourceType = 'pdf';
+
+      } else if (isMarkdown) {
+        content = await file.text();
+        sourceText = content;
+        sourceType = 'text';
       } else {
         content = await file.text();
         sourceText = content;
@@ -610,9 +618,9 @@ const App: React.FC = () => {
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <div className="bg-slate-100 p-6 rounded-full mb-6 group-hover:scale-110 group-hover:bg-indigo-50 transition-all duration-300"><Upload className="text-slate-400 group-hover:text-indigo-500" size={48} /></div>
                   <p className="mb-2 text-2xl font-bold text-slate-700">Drop your notes here</p>
-                  <p className="text-slate-400">PDF, Text, or Document Images (Max 15MB)</p>
+                  <p className="text-slate-400">PDF, Text, Markdown, or Images (Max 15MB)</p>
                 </div>
-                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,image/*" />
+                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md,image/*" />
               </label>
             </div>
 
