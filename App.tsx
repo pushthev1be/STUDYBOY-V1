@@ -430,7 +430,7 @@ const App: React.FC = () => {
           }}
         />;
       case 'quiz': return <QuizView 
-          questions={material.quiz} 
+          questions={Array.isArray(material.quiz) ? material.quiz : []} 
           onQuizComplete={(score, total, questions, questionStates) => {
             updateProgress('quiz', { perfect: score === total });
             const session: QuizSession = {

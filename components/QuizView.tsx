@@ -42,6 +42,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   onOpenUpload,
   resetKey
 }) => {
+  const safeQuestions = Array.isArray(questions) ? questions : [];
   const [sessionStates, setSessionStates] = useState<QuestionStatus[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -51,7 +52,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   useEffect(() => {
     setSessionStates(prev => {
       const newStates = [...prev];
-      for (let i = prev.length; i < questions.length; i++) {
+      for (let i = prev.length; i < safeQuestions.length; i++) {
         newStates.push({
           id: i,
           isAnswered: false,
@@ -63,11 +64,11 @@ export const QuizView: React.FC<QuizViewProps> = ({
       }
       return newStates;
     });
-  }, [questions]);
+  }, [safeQuestions]);
 
   useEffect(() => {
     if (!resetKey) return;
-    setSessionStates(questions.map((_, i) => ({
+    setSessionStates(safeQuestions.map((_, i) => ({
       id: i,
       isAnswered: false,
       isCorrect: null,
@@ -76,14 +77,14 @@ export const QuizView: React.FC<QuizViewProps> = ({
       showExplanation: false,
     })));
     setIsSubmitted(false);
-  }, [resetKey, questions]);
+  }, [resetKey, safeQuestions]);
 
   const stats = useMemo(() => {
     const answered = sessionStates.filter(s => s.isAnswered).length;
     const correct = sessionStates.filter(s => s.isCorrect === true).length;
     const flagged = sessionStates.filter(s => s.isFlagged).length;
-    return { answered, correct, flagged, total: questions.length };
-  }, [sessionStates, questions.length]);
+    return { answered, correct, flagged, total: safeQuestions.length };
+  }, [sessionStates, safeQuestions.length]);
 
   const getUploadForSession = (session: QuizSession) => {
     if (!session.uploadId) return undefined;
@@ -116,7 +117,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
     if (isSubmitted) return;
     
     const newStates = [...sessionStates];
-    const isCorrect = optionIndex === questions[qIdx].correctAnswer;
+    const isCorrect = optionIndex === safeQuestions[qIdx].correctAnswer;
     
     newStates[qIdx] = {
       ...newStates[qIdx],
@@ -144,12 +145,12 @@ export const QuizView: React.FC<QuizViewProps> = ({
     setIsSubmitted(true);
     if (onQuizComplete) {
       const finalizedStates = sessionStates.map(state => ({ ...state, showExplanation: true }));
-      onQuizComplete(stats.correct, stats.total, questions, finalizedStates);
+      onQuizComplete(stats.correct, stats.total, safeQuestions, finalizedStates);
     }
   };
 
   const restartSession = () => {
-    setSessionStates(questions.map((_, i) => ({
+    setSessionStates(safeQuestions.map((_, i) => ({
       id: i,
       isAnswered: false,
       isCorrect: null,
@@ -371,7 +372,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
       <div className="space-y-6">
         {(() => {
           let lastSubtopic = '';
-          return questions.map((q, qIdx) => {
+          return safeQuestions.map((q, qIdx) => {
             const status = sessionStates[qIdx];
             if (!status) return null;
             const subtopicHeader = q.subtopic && q.subtopic !== lastSubtopic;
