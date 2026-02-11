@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { QuizQuestion, QuestionStatus, QuizSession } from '../types';
+import { QuizQuestion, QuestionStatus, QuizSession, SavedUpload } from '../types';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -19,11 +19,15 @@ import {
 
 interface QuizViewProps {
   questions: QuizQuestion[];
-  onQuizComplete?: (score: number, total: number) => void;
+  onQuizComplete?: (score: number, total: number, questions: QuizQuestion[], questionStates: QuestionStatus[]) => void;
   onKeepGoing?: () => Promise<void>;
   onQuestionFailed?: () => Promise<void>;
   isExtending?: boolean;
   pastSessions?: QuizSession[];
+  savedUploads?: SavedUpload[];
+  onReattemptSession?: (session: QuizSession) => void;
+  onOpenUpload?: (upload: SavedUpload) => void;
+  resetKey?: string;
 }
 
 export const QuizView: React.FC<QuizViewProps> = ({ 
@@ -32,11 +36,16 @@ export const QuizView: React.FC<QuizViewProps> = ({
   onKeepGoing,
   onQuestionFailed,
   isExtending = false,
-  pastSessions = []
+  pastSessions = [],
+  savedUploads = [],
+  onReattemptSession,
+  onOpenUpload,
+  resetKey
 }) => {
   const [sessionStates, setSessionStates] = useState<QuestionStatus[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
 
   // Initialize and sync states when questions array grows
   useEffect(() => {
@@ -56,12 +65,52 @@ export const QuizView: React.FC<QuizViewProps> = ({
     });
   }, [questions]);
 
+  useEffect(() => {
+    if (!resetKey) return;
+    setSessionStates(questions.map((_, i) => ({
+      id: i,
+      isAnswered: false,
+      isCorrect: null,
+      selectedOption: null,
+      isFlagged: false,
+      showExplanation: false,
+    })));
+    setIsSubmitted(false);
+  }, [resetKey, questions]);
+
   const stats = useMemo(() => {
     const answered = sessionStates.filter(s => s.isAnswered).length;
     const correct = sessionStates.filter(s => s.isCorrect === true).length;
     const flagged = sessionStates.filter(s => s.isFlagged).length;
     return { answered, correct, flagged, total: questions.length };
   }, [sessionStates, questions.length]);
+
+  const getUploadForSession = (session: QuizSession) => {
+    if (!session.uploadId) return undefined;
+    return savedUploads.find(upload => upload.id === session.uploadId);
+  };
+
+  const handleDownloadUpload = (upload: SavedUpload | undefined, session: QuizSession) => {
+    if (!upload) return;
+    if (upload.sourceType === 'image' && upload.sourceDataUrl) {
+      const link = document.createElement('a');
+      link.href = upload.sourceDataUrl;
+      link.download = upload.fileName || `${session.topic}.png`;
+      link.click();
+      return;
+    }
+    if (upload.sourceText) {
+      const baseName = upload.fileName ? upload.fileName.replace(/\.[^/.]+$/, '') : session.topic;
+      const fileName = `${baseName}.txt`;
+      const blob = new Blob([upload.sourceText], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  };
 
   const handleOptionSelect = (qIdx: number, optionIndex: number) => {
     if (isSubmitted) return;
@@ -94,7 +143,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsSubmitted(true);
     if (onQuizComplete) {
-      onQuizComplete(stats.correct, stats.total);
+      const finalizedStates = sessionStates.map(state => ({ ...state, showExplanation: true }));
+      onQuizComplete(stats.correct, stats.total, questions, finalizedStates);
     }
   };
 
@@ -199,20 +249,118 @@ export const QuizView: React.FC<QuizViewProps> = ({
           </button>
           {showHistory && (
             <div className="border-t border-slate-100 divide-y divide-slate-100">
-              {pastSessions.map((session) => (
-                <div key={session.id} className="px-5 py-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-700 text-sm">{session.topic}</p>
-                    <p className="text-xs text-slate-400">{new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+              {pastSessions.map((session) => {
+                const upload = getUploadForSession(session);
+                const isExpanded = expandedSessionId === session.id;
+                const hasReview = session.questions && session.questionStates && session.questionStates.length > 0;
+
+                return (
+                  <div key={session.id} className="px-5 py-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-slate-700 text-sm">{session.topic}</p>
+                        <p className="text-xs text-slate-400">{new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                        {upload && (
+                          <p className="text-xs text-slate-400 mt-1">File: {upload.fileName} • {upload.domain}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 justify-between md:justify-end">
+                        <div className="text-right mr-2">
+                          <span className={`text-lg font-bold ${session.score === session.total ? 'text-emerald-600' : session.score / session.total >= 0.7 ? 'text-indigo-600' : 'text-amber-600'}`}>
+                            {Math.round((session.score / session.total) * 100)}%
+                          </span>
+                          <p className="text-xs text-slate-400">{session.score}/{session.total} correct</p>
+                        </div>
+                        {upload && onOpenUpload && (
+                          <button
+                            onClick={() => onOpenUpload(upload)}
+                            className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all"
+                          >
+                            Open Upload
+                          </button>
+                        )}
+                        {upload && (upload.sourceText || upload.sourceDataUrl) && (
+                          <button
+                            onClick={() => handleDownloadUpload(upload, session)}
+                            className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
+                          >
+                            Download
+                          </button>
+                        )}
+                        {onReattemptSession && (
+                          <button
+                            onClick={() => onReattemptSession(session)}
+                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all"
+                          >
+                            Reattempt
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
+                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all"
+                        >
+                          {isExpanded ? 'Hide Review' : 'Review'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="mt-4 space-y-6">
+                        {!hasReview && (
+                          <div className="text-xs text-slate-400">Session details unavailable for older attempts.</div>
+                        )}
+                        {hasReview && session.questions.map((q, qIdx) => {
+                          const state = session.questionStates[qIdx];
+                          const selectedOption = state?.selectedOption ?? null;
+                          const isCorrect = state?.isCorrect ?? null;
+
+                          return (
+                            <div key={qIdx} className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
+                              <div className="flex items-start justify-between gap-3 mb-4">
+                                <div>
+                                  <p className="text-sm font-bold text-slate-800">Q{qIdx + 1}. {q.question}</p>
+                                  {!state?.isAnswered && (
+                                    <span className="inline-block mt-2 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Unanswered</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {q.options.map((option, oIdx) => {
+                                  const isSelected = selectedOption === oIdx;
+                                  const isOptionCorrect = oIdx === q.correctAnswer;
+
+                                  let style = "border-slate-200 bg-white";
+                                  if (isOptionCorrect) style = "border-emerald-400 bg-emerald-50";
+                                  if (isSelected && !isOptionCorrect) style = "border-rose-400 bg-rose-50";
+                                  if (!isSelected && !isOptionCorrect && selectedOption !== null) style = "border-slate-100 bg-white opacity-70";
+
+                                  return (
+                                    <div key={oIdx} className={`p-4 rounded-xl border-2 text-sm ${style}`}>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold ${isOptionCorrect ? 'border-emerald-500 text-emerald-600' : isSelected ? 'border-rose-500 text-rose-600' : 'border-slate-300 text-slate-400'}`}>
+                                          {String.fromCharCode(65 + oIdx)}
+                                        </span>
+                                        <span className="text-slate-700">{option}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="mt-4 text-xs text-slate-500">
+                                <span className={`font-bold ${isCorrect ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {isCorrect ? 'Correct' : state?.isAnswered ? 'Incorrect' : 'Not Answered'}
+                                </span>
+                                <span className="mx-2">•</span>
+                                <span className="text-slate-600">{q.explanation}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <span className={`text-lg font-bold ${session.score === session.total ? 'text-emerald-600' : session.score / session.total >= 0.7 ? 'text-indigo-600' : 'text-amber-600'}`}>
-                      {Math.round((session.score / session.total) * 100)}%
-                    </span>
-                    <p className="text-xs text-slate-400">{session.score}/{session.total} correct</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

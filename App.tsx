@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope } from 'lucide-react';
-import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession } from './types';
+import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope, History } from 'lucide-react';
+import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload } from './types';
 import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
@@ -93,6 +93,9 @@ const App: React.FC = () => {
   const [goals, setGoals] = useState<StudyGoal[]>(INITIAL_GOALS);
   const [showNotification, setShowNotification] = useState<string | null>(null);
   const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
+  const [savedUploads, setSavedUploads] = useState<SavedUpload[]>([]);
+  const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
+  const [quizResetKey, setQuizResetKey] = useState<string>('');
 
   useEffect(() => {
     let interval: number;
@@ -127,6 +130,8 @@ const App: React.FC = () => {
     }
     const savedSessions = localStorage.getItem('sg_quiz_sessions');
     if (savedSessions) setQuizSessions(JSON.parse(savedSessions));
+    const savedUploads = localStorage.getItem('sg_uploads');
+    if (savedUploads) setSavedUploads(JSON.parse(savedUploads));
   }, []);
 
   useEffect(() => {
@@ -135,7 +140,8 @@ const App: React.FC = () => {
     localStorage.setItem('sg_achievements', JSON.stringify(achievements));
     localStorage.setItem('sg_goals', JSON.stringify(goals));
     localStorage.setItem('sg_quiz_sessions', JSON.stringify(quizSessions));
-  }, [user, stats, achievements, goals, quizSessions]);
+    localStorage.setItem('sg_uploads', JSON.stringify(savedUploads));
+  }, [user, stats, achievements, goals, quizSessions, savedUploads]);
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -226,17 +232,27 @@ const App: React.FC = () => {
       const isImage = file.type.startsWith('image/');
       const isPDF = file.type === 'application/pdf';
       let content = '';
+      let sourceText: string | undefined;
+      let sourceDataUrl: string | undefined;
+      let sourceType: 'text' | 'pdf' | 'image' = 'text';
 
       if (isImage) {
-        content = await new Promise((resolve) => {
+        const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.onloadend = () => resolve(reader.result as string);
           reader.readAsDataURL(file);
         });
+        sourceDataUrl = dataUrl;
+        content = dataUrl.split(',')[1];
+        sourceType = 'image';
       } else if (isPDF) {
         content = await extractTextFromPDF(file);
+        sourceText = content;
+        sourceType = 'pdf';
       } else {
         content = await file.text();
+        sourceText = content;
+        sourceType = 'text';
       }
 
       if (!content || content.trim().length < 20) {
@@ -265,10 +281,31 @@ const App: React.FC = () => {
         ? Math.round((content.length / (content.length + unprocessedContent.length)) * 100)
         : 100;
       
-      setMaterial({
+      const nextMaterial: StudyMaterial = {
         ...result,
         unprocessedContent,
         contentCoveragePercent: coveragePercent
+      };
+
+      const uploadId = Date.now().toString();
+      setActiveUploadId(uploadId);
+      setMaterial(nextMaterial);
+      setQuizResetKey(Date.now().toString());
+      setSavedUploads(prev => {
+        const filtered = prev.filter(upload => !(upload.fileName === file.name && upload.title === (result.title || file.name)));
+        const newUpload: SavedUpload = {
+          id: uploadId,
+          fileName: file.name,
+          title: result.title || file.name,
+          domain: selectedDomain,
+          createdAt: new Date().toISOString(),
+          material: nextMaterial,
+          sourceType,
+          sourceText,
+          sourceDataUrl,
+          sourceMimeType: file.type || undefined
+        };
+        return [newUpload, ...filtered].slice(0, 20);
       });
       setState(AppState.VIEWING);
       updateProgress('upload');
@@ -351,6 +388,15 @@ const App: React.FC = () => {
     setState(AppState.AUTH);
   };
 
+  const handleOpenUpload = (upload: SavedUpload) => {
+    setMaterial(upload.material);
+    setSelectedDomain(upload.domain);
+    setViewMode('summary');
+    setState(AppState.VIEWING);
+    setActiveUploadId(upload.id);
+    setQuizResetKey(Date.now().toString());
+  };
+
   if (state === AppState.AUTH) {
     return <AuthView onAuth={(u) => { setUser(u); setState(AppState.IDLE); }} />;
   }
@@ -385,14 +431,17 @@ const App: React.FC = () => {
         />;
       case 'quiz': return <QuizView 
           questions={material.quiz} 
-          onQuizComplete={(score, total) => {
+          onQuizComplete={(score, total, questions, questionStates) => {
             updateProgress('quiz', { perfect: score === total });
             const session: QuizSession = {
               id: Date.now().toString(),
               topic: material.title,
               score,
               total,
-              date: new Date().toISOString()
+              date: new Date().toISOString(),
+              questions,
+              questionStates,
+              uploadId: activeUploadId || undefined
             };
             setQuizSessions(prev => [session, ...prev].slice(0, 50));
           }}
@@ -400,6 +449,25 @@ const App: React.FC = () => {
           onQuestionFailed={handleQuestionFailed}
           isExtending={isExtending}
           pastSessions={quizSessions}
+          savedUploads={savedUploads}
+          onOpenUpload={handleOpenUpload}
+          onReattemptSession={(session) => {
+            const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
+            if (upload) {
+              handleOpenUpload(upload);
+            } else if (material) {
+              setMaterial({
+                ...material,
+                title: session.topic,
+                quiz: session.questions
+              });
+              setState(AppState.VIEWING);
+            }
+            setViewMode('quiz');
+            setActiveUploadId(session.uploadId || null);
+            setQuizResetKey(Date.now().toString());
+          }}
+          resetKey={quizResetKey}
         />;
       default: return null;
     }
@@ -496,6 +564,34 @@ const App: React.FC = () => {
                 <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,image/*" />
               </label>
             </div>
+
+            {savedUploads.length > 0 && (
+              <div className="mt-10 bg-white rounded-2xl border border-slate-200 p-6 text-left shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <History size={18} className="text-indigo-500" />
+                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Previous Uploads</h3>
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{savedUploads.length}</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {savedUploads.slice(0, 6).map((upload) => (
+                    <div key={upload.id} className="py-3 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">{upload.title}</p>
+                        <p className="text-xs text-slate-400">
+                          {upload.fileName} • {upload.domain} • {new Date(upload.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleOpenUpload(upload)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="mt-16 flex items-center justify-center gap-12">
                <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-indigo-600 mb-1">{stats.streakDays}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Day Streak</div></div>
                <div className="w-px h-12 bg-slate-200"></div>

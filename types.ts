@@ -84,6 +84,9 @@ export interface QuizSession {
   score: number;
   total: number;
   date: string;
+  questions: QuizQuestion[];
+  questionStates: QuestionStatus[];
+  uploadId?: string;
 }
 
 export interface ProcessingState {
@@ -91,4 +94,17 @@ export interface ProcessingState {
   processedContent: string;
   unprocessedContent: string;
   fileName: string;
+}
+
+export interface SavedUpload {
+  id: string;
+  fileName: string;
+  title: string;
+  domain: StudyDomain;
+  createdAt: string;
+  material: StudyMaterial;
+  sourceType: 'text' | 'pdf' | 'image';
+  sourceText?: string;
+  sourceDataUrl?: string;
+  sourceMimeType?: string;
 }
