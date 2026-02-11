@@ -452,6 +452,7 @@ const App: React.FC = () => {
           savedUploads={savedUploads}
           onOpenUpload={handleOpenUpload}
           onReattemptSession={(session) => {
+            if (!session.questions || session.questions.length === 0) return;
             const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
             if (upload) {
               handleOpenUpload(upload);

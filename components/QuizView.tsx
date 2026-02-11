@@ -252,7 +252,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
               {pastSessions.map((session) => {
                 const upload = getUploadForSession(session);
                 const isExpanded = expandedSessionId === session.id;
-                const hasReview = session.questions && session.questionStates && session.questionStates.length > 0;
+                const hasQuestions = Array.isArray(session.questions) && session.questions.length > 0;
+                const hasReview = hasQuestions && Array.isArray(session.questionStates) && session.questionStates.length > 0;
 
                 return (
                   <div key={session.id} className="px-5 py-4">
@@ -287,7 +288,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                             Download
                           </button>
                         )}
-                        {onReattemptSession && (
+                        {onReattemptSession && hasQuestions && (
                           <button
                             onClick={() => onReattemptSession(session)}
                             className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all"
@@ -297,6 +298,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         )}
                         <button
                           onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
+                          disabled={!hasQuestions}
                           className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all"
                         >
                           {isExpanded ? 'Hide Review' : 'Review'}
