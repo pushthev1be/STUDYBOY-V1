@@ -258,6 +258,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                   : (upload?.material?.quiz || []);
                 const hasQuestions = sessionQuestions.length > 0;
                 const hasReview = hasQuestions && Array.isArray(session.questionStates) && session.questionStates.length > 0;
+                const canToggleReview = hasQuestions || Array.isArray(session.questionStates) && session.questionStates.length > 0;
 
                 return (
                   <div key={session.id} className="px-5 py-4">
@@ -302,8 +303,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         )}
                         <button
                           onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
-                          disabled={!hasQuestions}
-                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all"
+                          disabled={!canToggleReview}
+                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isExpanded ? 'Hide Review' : 'Review'}
                         </button>
@@ -312,7 +313,12 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
                     {isExpanded && (
                       <div className="mt-4 space-y-6">
-                        {!hasReview && (
+                        {!hasQuestions && (
+                          <div className="text-xs text-slate-400">
+                            This session doesn’t have stored questions to review. Reattempt to regenerate a reviewable quiz.
+                          </div>
+                        )}
+                        {hasQuestions && !hasReview && (
                           <div className="text-xs text-slate-400">
                             Answer history isn’t available for this session. You can reattempt to generate a new review.
                           </div>
