@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope, History } from 'lucide-react';
+import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope, History, Home } from 'lucide-react';
 import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload } from './types';
 import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
@@ -541,6 +541,15 @@ const App: React.FC = () => {
             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-tighter">
               <Zap size={14} fill="currentColor" /> Flash Engine Active
             </div>
+            {state !== AppState.IDLE && (
+              <button
+                onClick={() => setState(AppState.IDLE)}
+                className="p-2.5 rounded-2xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
+                title="Back to Dashboard"
+              >
+                <Home size={20} />
+              </button>
+            )}
             {state === AppState.VIEWING && (
               <div className="hidden md:flex bg-slate-100 p-1.5 rounded-2xl gap-1">
                 {[
