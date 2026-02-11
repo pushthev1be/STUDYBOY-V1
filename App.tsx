@@ -87,7 +87,7 @@ const App: React.FC = () => {
   const [processedChars, setProcessedChars] = useState(0);
   const [processingState, setProcessingState] = useState<ProcessingState | null>(null);
   const [selectedDomain, setSelectedDomain] = useState<StudyDomain>('PA');
-  
+
   const [stats, setStats] = useState<UserStats>(INITIAL_STATS);
   const [achievements, setAchievements] = useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
   const [goals, setGoals] = useState<StudyGoal[]>(INITIAL_GOALS);
@@ -147,7 +147,7 @@ const App: React.FC = () => {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = "";
-    
+
     // Process up to 50 pages for speed/safety
     const pageLimit = Math.min(pdf.numPages, 50);
     for (let i = 1; i <= pageLimit; i++) {
@@ -157,7 +157,7 @@ const App: React.FC = () => {
       fullText += strings.join(" ") + "\n";
       if (fullText.length > MAX_CHAR_COUNT) break;
     }
-    
+
     return fullText;
   };
 
@@ -178,10 +178,10 @@ const App: React.FC = () => {
       const now = new Date();
       const last = new Date(prev.lastActive);
       if (now.toDateString() !== last.toDateString()) {
-         const diffTime = Math.abs(now.getTime() - last.getTime());
-         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-         if (diffDays === 1) newStats.streakDays += 1;
-         else if (diffDays > 1) newStats.streakDays = 1;
+        const diffTime = Math.abs(now.getTime() - last.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) newStats.streakDays += 1;
+        else if (diffDays > 1) newStats.streakDays = 1;
       }
 
       if (newStats.streakDays >= 3) triggerAchievement('on_fire');
@@ -267,7 +267,7 @@ const App: React.FC = () => {
       }
 
       setProcessedChars(content.length);
-      
+
       // Store processing state for later use
       setProcessingState({
         totalContent: content + unprocessedContent,
@@ -277,10 +277,10 @@ const App: React.FC = () => {
       });
 
       const result = await processStudyContent(content, isImage, selectedDomain);
-      const coveragePercent = unprocessedContent 
+      const coveragePercent = unprocessedContent
         ? Math.round((content.length / (content.length + unprocessedContent.length)) * 100)
         : 100;
-      
+
       const nextMaterial: StudyMaterial = {
         ...result,
         unprocessedContent,
@@ -318,7 +318,7 @@ const App: React.FC = () => {
 
   const handleKeepGoing = async () => {
     if (!material || isExtending) return;
-    
+
     // If there's unprocessed content, generate from that
     if (material.unprocessedContent) {
       setIsExtending(true);
@@ -363,7 +363,7 @@ const App: React.FC = () => {
 
   const handleQuestionFailed = async () => {
     if (!material || isExtending) return;
-    
+
     setIsExtending(true);
     try {
       const newQuestions = await generateQuestionForFailure(material.title);
@@ -407,72 +407,72 @@ const App: React.FC = () => {
 
     switch (viewMode) {
       case 'summary': return <SummaryView summary={material.summary} title={material.title} contentCoveragePercent={material.contentCoveragePercent} hasUnprocessedContent={!!material.unprocessedContent} />;
-      case 'flashcards': return <FlashcardView 
-          cards={material.flashcards}
-          topic={material.title}
-          onCardViewed={() => updateProgress('flashcard')}
-          onCardRated={(cardIndex, quality) => {
-            const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
+      case 'flashcards': return <FlashcardView
+        cards={material.flashcards}
+        topic={material.title}
+        onCardViewed={() => updateProgress('flashcard')}
+        onCardRated={(cardIndex, quality) => {
+          const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
+          setMaterial({
+            ...material,
+            flashcards: material.flashcards.map((card, idx) =>
+              idx === cardIndex
+                ? { ...card, ...updated }
+                : card
+            )
+          });
+        }}
+        onLoadMore={(newCards) => {
+          setMaterial({
+            ...material,
+            flashcards: [...material.flashcards, ...newCards]
+          });
+        }}
+      />;
+      case 'quiz': return <QuizView
+        questions={Array.isArray(material.quiz) ? material.quiz : []}
+        onQuizComplete={(score, total, questions, questionStates) => {
+          updateProgress('quiz', { perfect: score === total });
+          const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : Date.now().toString();
+          const session: QuizSession = {
+            id: sessionId,
+            topic: material.title,
+            score,
+            total,
+            date: new Date().toISOString(),
+            questions: [...questions],
+            questionStates,
+            uploadId: activeUploadId || undefined
+          };
+          setQuizSessions(prev => [session, ...prev].slice(0, 50));
+        }}
+        onKeepGoing={handleKeepGoing}
+        onQuestionFailed={handleQuestionFailed}
+        isExtending={isExtending}
+        pastSessions={quizSessions}
+        savedUploads={savedUploads}
+        onOpenUpload={handleOpenUpload}
+        onReattemptSession={(session) => {
+          const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
+          if ((!session.questions || session.questions.length === 0) && !upload) return;
+          if (upload) {
+            handleOpenUpload(upload);
+          } else if (material) {
             setMaterial({
               ...material,
-              flashcards: material.flashcards.map((card, idx) => 
-                idx === cardIndex 
-                  ? { ...card, ...updated }
-                  : card
-              )
+              title: session.topic,
+              quiz: session.questions
             });
-          }}
-          onLoadMore={(newCards) => {
-            setMaterial({
-              ...material,
-              flashcards: [...material.flashcards, ...newCards]
-            });
-          }}
-        />;
-      case 'quiz': return <QuizView 
-          questions={Array.isArray(material.quiz) ? material.quiz : []} 
-          onQuizComplete={(score, total, questions, questionStates) => {
-            updateProgress('quiz', { perfect: score === total });
-            const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-              ? crypto.randomUUID()
-              : Date.now().toString();
-            const session: QuizSession = {
-              id: sessionId,
-              topic: material.title,
-              score,
-              total,
-              date: new Date().toISOString(),
-              questions,
-              questionStates,
-              uploadId: activeUploadId || undefined
-            };
-            setQuizSessions(prev => [session, ...prev].slice(0, 50));
-          }}
-          onKeepGoing={handleKeepGoing}
-          onQuestionFailed={handleQuestionFailed}
-          isExtending={isExtending}
-          pastSessions={quizSessions}
-          savedUploads={savedUploads}
-          onOpenUpload={handleOpenUpload}
-          onReattemptSession={(session) => {
-            const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
-            if ((!session.questions || session.questions.length === 0) && !upload) return;
-            if (upload) {
-              handleOpenUpload(upload);
-            } else if (material) {
-              setMaterial({
-                ...material,
-                title: session.topic,
-                quiz: session.questions
-              });
-              setState(AppState.VIEWING);
-            }
-            setViewMode('quiz');
-            setActiveUploadId(session.uploadId || null);
-            setQuizResetKey(Date.now().toString());
-          }}
-          resetKey={quizResetKey}
-        />;
+            setState(AppState.VIEWING);
+          }
+          setViewMode('quiz');
+          setActiveUploadId(session.uploadId || null);
+          setQuizResetKey(Date.now().toString());
+        }}
+        resetKey={quizResetKey}
+      />;
       default: return null;
     }
   };
@@ -496,7 +496,7 @@ const App: React.FC = () => {
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-tighter">
               <Zap size={14} fill="currentColor" /> Flash Engine Active
@@ -512,9 +512,8 @@ const App: React.FC = () => {
                   <button
                     key={mode.id}
                     onClick={() => setViewMode(mode.id as ViewMode)}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-                      viewMode === mode.id ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
-                    }`}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${viewMode === mode.id ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                      }`}
                   >
                     <mode.icon size={18} /> {mode.label}
                   </button>
@@ -543,11 +542,10 @@ const App: React.FC = () => {
                   <button
                     key={domain}
                     onClick={() => setSelectedDomain(domain)}
-                    className={`py-3 px-4 rounded-xl font-bold transition-all ${
-                      selectedDomain === domain
+                    className={`py-3 px-4 rounded-xl font-bold transition-all ${selectedDomain === domain
                         ? 'bg-indigo-600 text-white shadow-lg'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     {domain === 'PA' && 'PA (PANCE)'}
                     {domain === 'Nursing' && 'Nursing (NCLEX)'}
@@ -597,11 +595,11 @@ const App: React.FC = () => {
               </div>
             )}
             <div className="mt-16 flex items-center justify-center gap-12">
-               <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-indigo-600 mb-1">{stats.streakDays}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Day Streak</div></div>
-               <div className="w-px h-12 bg-slate-200"></div>
-               <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Documents</div></div>
-               <div className="w-px h-12 bg-slate-200"></div>
-               <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Practice Sets</div></div>
+              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-indigo-600 mb-1">{stats.streakDays}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Day Streak</div></div>
+              <div className="w-px h-12 bg-slate-200"></div>
+              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Documents</div></div>
+              <div className="w-px h-12 bg-slate-200"></div>
+              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Practice Sets</div></div>
             </div>
           </div>
         )}
@@ -619,10 +617,10 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Optimizing Content</h2>
               <div className="w-full space-y-4">
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                   <div 
+                  <div
                     className="h-full bg-indigo-600 transition-all duration-[3000ms] ease-linear"
                     style={{ width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%` }}
-                   />
+                  />
                 </div>
                 <p className="text-indigo-600 text-sm font-bold text-center tracking-wide uppercase transition-all animate-pulse">
                   {LOADING_STEPS[loadingStep]}
@@ -655,7 +653,7 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 text-center">
           <div className="flex flex-col items-center gap-2">
             <p className="text-slate-400 text-xs font-medium flex items-center gap-1.5">
-              Support this project with a <Heart size={12} className="text-indigo-500 fill-indigo-500" /> 
+              Support this project with a <Heart size={12} className="text-indigo-500 fill-indigo-500" />
             </p>
             <div className="bg-white/50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-3">
               <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Zelle</span>

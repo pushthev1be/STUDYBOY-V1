@@ -304,8 +304,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         )}
                         <button
                           onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
-                          disabled={!canToggleReview}
-                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all"
                         >
                           {isExpanded ? 'Hide Review' : 'Review'}
                         </button>
