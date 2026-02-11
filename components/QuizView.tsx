@@ -257,8 +257,9 @@ export const QuizView: React.FC<QuizViewProps> = ({
                   ? session.questions
                   : (upload?.material?.quiz || []);
                 const hasQuestions = sessionQuestions.length > 0;
-                const hasReview = hasQuestions && Array.isArray(session.questionStates) && session.questionStates.length > 0;
-                const canToggleReview = hasQuestions || Array.isArray(session.questionStates) && session.questionStates.length > 0;
+                const questionStates = Array.isArray(session.questionStates) ? session.questionStates : [];
+                const hasAnswerHistory = questionStates.length > 0;
+                const canToggleReview = hasQuestions;
 
                 return (
                   <div key={session.id} className="px-5 py-4">
@@ -318,13 +319,20 @@ export const QuizView: React.FC<QuizViewProps> = ({
                             This session doesn’t have stored questions to review. Reattempt to regenerate a reviewable quiz.
                           </div>
                         )}
-                        {hasQuestions && !hasReview && (
+                        {hasQuestions && !hasAnswerHistory && (
                           <div className="text-xs text-slate-400">
-                            Answer history isn’t available for this session. You can reattempt to generate a new review.
+                            Answer history isn’t available for this session. Questions are shown without selections.
                           </div>
                         )}
-                        {hasReview && sessionQuestions.map((q, qIdx) => {
-                          const state = session.questionStates[qIdx];
+                        {hasQuestions && sessionQuestions.map((q, qIdx) => {
+                          const state = questionStates[qIdx] || {
+                            id: qIdx,
+                            isAnswered: false,
+                            isCorrect: null,
+                            selectedOption: null,
+                            isFlagged: false,
+                            showExplanation: false,
+                          };
                           const selectedOption = state?.selectedOption ?? null;
                           const isCorrect = state?.isCorrect ?? null;
 

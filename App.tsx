@@ -433,8 +433,11 @@ const App: React.FC = () => {
           questions={Array.isArray(material.quiz) ? material.quiz : []} 
           onQuizComplete={(score, total, questions, questionStates) => {
             updateProgress('quiz', { perfect: score === total });
+            const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : Date.now().toString();
             const session: QuizSession = {
-              id: Date.now().toString(),
+              id: sessionId,
               topic: material.title,
               score,
               total,
