@@ -253,7 +253,10 @@ export const QuizView: React.FC<QuizViewProps> = ({
               {pastSessions.map((session) => {
                 const upload = getUploadForSession(session);
                 const isExpanded = expandedSessionId === session.id;
-                const hasQuestions = Array.isArray(session.questions) && session.questions.length > 0;
+                const sessionQuestions = (Array.isArray(session.questions) && session.questions.length > 0)
+                  ? session.questions
+                  : (upload?.material?.quiz || []);
+                const hasQuestions = sessionQuestions.length > 0;
                 const hasReview = hasQuestions && Array.isArray(session.questionStates) && session.questionStates.length > 0;
 
                 return (
@@ -310,9 +313,11 @@ export const QuizView: React.FC<QuizViewProps> = ({
                     {isExpanded && (
                       <div className="mt-4 space-y-6">
                         {!hasReview && (
-                          <div className="text-xs text-slate-400">Session details unavailable for older attempts.</div>
+                          <div className="text-xs text-slate-400">
+                            Answer history isn’t available for this session. You can reattempt to generate a new review.
+                          </div>
                         )}
-                        {hasReview && session.questions.map((q, qIdx) => {
+                        {hasReview && sessionQuestions.map((q, qIdx) => {
                           const state = session.questionStates[qIdx];
                           const selectedOption = state?.selectedOption ?? null;
                           const isCorrect = state?.isCorrect ?? null;
