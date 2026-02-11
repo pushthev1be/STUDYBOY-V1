@@ -7,6 +7,7 @@ import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
 import { QuizView } from './components/QuizView';
 import { AchievementsView } from './components/AchievementsView';
+import { SessionList } from './components/SessionList';
 import { AuthView } from './components/AuthView';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -397,6 +398,45 @@ const App: React.FC = () => {
     setQuizResetKey(Date.now().toString());
   };
 
+  /* Shared session loading logic */
+  const handleReattemptSession = (session: QuizSession) => {
+    const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
+
+    // If no questions in session AND no upload, we can't do anything
+    if ((!session.questions || session.questions.length === 0) && !upload) {
+      setErrorMessage("Cannot reload this session: missing question data.");
+      setState(AppState.ERROR);
+      return;
+    }
+
+    if (upload) {
+      handleOpenUpload(upload);
+      // Wait for state update then switch to quiz? 
+      // handleOpenUpload sets viewMode='summary'. We want 'quiz'.
+      // Since we can't chain easily without effect, we might need a distinct flow.
+      // But actually, if we just want to re-take the quiz from the upload:
+      setTimeout(() => setViewMode('quiz'), 0);
+    } else {
+      // Standalone session (or missing upload but has questions)
+      if (session.questions && session.questions.length > 0) {
+        setMaterial({
+          title: session.topic,
+          summary: 'Viewing past session',
+          flashcards: [],
+          quiz: session.questions,
+          unprocessedContent: '',
+          contentCoveragePercent: 100
+        });
+        setState(AppState.VIEWING);
+        setViewMode('quiz');
+      }
+    }
+
+    setActiveUploadId(session.uploadId || null);
+    setQuizResetKey(Date.now().toString());
+  };
+
+
   if (state === AppState.AUTH) {
     return <AuthView onAuth={(u) => { setUser(u); setState(AppState.IDLE); }} />;
   }
@@ -543,8 +583,8 @@ const App: React.FC = () => {
                     key={domain}
                     onClick={() => setSelectedDomain(domain)}
                     className={`py-3 px-4 rounded-xl font-bold transition-all ${selectedDomain === domain
-                        ? 'bg-indigo-600 text-white shadow-lg'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-indigo-600 text-white shadow-lg'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                   >
                     {domain === 'PA' && 'PA (PANCE)'}
@@ -591,6 +631,24 @@ const App: React.FC = () => {
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {quizSessions.length > 0 && (
+              <div className="mt-10 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm text-left">
+                <div className="p-6 border-b border-slate-100 flex items-center gap-2">
+                  <History size={18} className="text-indigo-500" />
+                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Past Quiz Sessions</h3>
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{quizSessions.length}</span>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                  <SessionList
+                    sessions={quizSessions}
+                    savedUploads={savedUploads}
+                    onReattempt={handleReattemptSession}
+                    onOpenUpload={handleOpenUpload}
+                  />
                 </div>
               </div>
             )}

@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { QuizQuestion, QuestionStatus, QuizSession, SavedUpload } from '../types';
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Flag, 
-  RotateCcw, 
-  Award, 
+import {
+  CheckCircle2,
+  XCircle,
+  Flag,
+  RotateCcw,
+  Award,
   Check,
   Sparkles,
   PlusCircle,
@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { SessionList } from './SessionList';
 
 interface QuizViewProps {
   questions: QuizQuestion[];
@@ -30,9 +31,9 @@ interface QuizViewProps {
   resetKey?: string;
 }
 
-export const QuizView: React.FC<QuizViewProps> = ({ 
-  questions, 
-  onQuizComplete, 
+export const QuizView: React.FC<QuizViewProps> = ({
+  questions,
+  onQuizComplete,
   onKeepGoing,
   onQuestionFailed,
   isExtending = false,
@@ -115,10 +116,10 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
   const handleOptionSelect = (qIdx: number, optionIndex: number) => {
     if (isSubmitted) return;
-    
+
     const newStates = [...sessionStates];
     const isCorrect = optionIndex === safeQuestions[qIdx].correctAnswer;
-    
+
     newStates[qIdx] = {
       ...newStates[qIdx],
       selectedOption: optionIndex,
@@ -127,7 +128,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
       showExplanation: true
     };
     setSessionStates(newStates);
-    
+
     // Trigger auto-generate 2 more questions on failure
     if (!isCorrect && onQuestionFailed) {
       onQuestionFailed();
@@ -185,7 +186,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
               <div className="text-sm text-slate-500 font-medium">Review Later</div>
             </div>
           </div>
-          <button 
+          <button
             onClick={restartSession}
             className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2"
           >
@@ -200,22 +201,22 @@ export const QuizView: React.FC<QuizViewProps> = ({
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-32">
       <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-24 z-30">
         <div className="flex items-center gap-4">
-           <div className="bg-indigo-50 p-3 rounded-xl">
-              <Stethoscope className="text-indigo-600" size={24} />
-           </div>
-           <div>
-              <h2 className="text-xl font-bold text-slate-800">Clinical Vignettes</h2>
-              <p className="text-sm text-slate-500">Board-style practice questions</p>
-           </div>
+          <div className="bg-indigo-50 p-3 rounded-xl">
+            <Stethoscope className="text-indigo-600" size={24} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Clinical Vignettes</h2>
+            <p className="text-sm text-slate-500">Board-style practice questions</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block mr-2">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Questions Found</div>
             <div className="text-sm font-bold text-indigo-600">{stats.answered} / {stats.total}</div>
           </div>
-          
+
           {onKeepGoing && (
-            <button 
+            <button
               onClick={onKeepGoing}
               disabled={isExtending}
               className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold hover:bg-indigo-50 transition-all disabled:opacity-50"
@@ -225,7 +226,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
             </button>
           )}
 
-          <button 
+          <button
             onClick={finalizeSession}
             disabled={stats.answered === 0}
             className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 shadow-lg"
@@ -248,144 +249,19 @@ export const QuizView: React.FC<QuizViewProps> = ({
             </div>
             {showHistory ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
           </button>
+
           {showHistory && (
-            <div className="border-t border-slate-100 divide-y divide-slate-100">
-              {pastSessions.map((session) => {
-                const upload = getUploadForSession(session);
-                const isExpanded = expandedSessionId === session.id;
-                const sessionQuestions = (Array.isArray(session.questions) && session.questions.length > 0)
-                  ? session.questions
-                  : (upload?.material?.quiz || []);
-                const hasQuestions = sessionQuestions.length > 0;
-                const questionStates = Array.isArray(session.questionStates) ? session.questionStates : [];
-                const hasAnswerHistory = questionStates.length > 0;
-                const canToggleReview = hasQuestions;
-
-                return (
-                  <div key={session.id} className="px-5 py-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-slate-700 text-sm">{session.topic}</p>
-                        <p className="text-xs text-slate-400">{new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                        {upload && (
-                          <p className="text-xs text-slate-400 mt-1">File: {upload.fileName} • {upload.domain}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 justify-between md:justify-end">
-                        <div className="text-right mr-2">
-                          <span className={`text-lg font-bold ${session.score === session.total ? 'text-emerald-600' : session.score / session.total >= 0.7 ? 'text-indigo-600' : 'text-amber-600'}`}>
-                            {Math.round((session.score / session.total) * 100)}%
-                          </span>
-                          <p className="text-xs text-slate-400">{session.score}/{session.total} correct</p>
-                        </div>
-                        {upload && onOpenUpload && (
-                          <button
-                            onClick={() => onOpenUpload(upload)}
-                            className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all"
-                          >
-                            Open Upload
-                          </button>
-                        )}
-                        {upload && (upload.sourceText || upload.sourceDataUrl) && (
-                          <button
-                            onClick={() => handleDownloadUpload(upload, session)}
-                            className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
-                          >
-                            Download
-                          </button>
-                        )}
-                        {onReattemptSession && hasQuestions && (
-                          <button
-                            onClick={() => onReattemptSession(session)}
-                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all"
-                          >
-                            Reattempt
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
-                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all"
-                        >
-                          {isExpanded ? 'Hide Review' : 'Review'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="mt-4 space-y-6">
-                        {!hasQuestions && (
-                          <div className="text-xs text-slate-400">
-                            This session doesn’t have stored questions to review. Reattempt to regenerate a reviewable quiz.
-                          </div>
-                        )}
-                        {hasQuestions && !hasAnswerHistory && (
-                          <div className="text-xs text-slate-400">
-                            Answer history isn’t available for this session. Questions are shown without selections.
-                          </div>
-                        )}
-                        {hasQuestions && sessionQuestions.map((q, qIdx) => {
-                          const state = questionStates[qIdx] || {
-                            id: qIdx,
-                            isAnswered: false,
-                            isCorrect: null,
-                            selectedOption: null,
-                            isFlagged: false,
-                            showExplanation: false,
-                          };
-                          const selectedOption = state?.selectedOption ?? null;
-                          const isCorrect = state?.isCorrect ?? null;
-
-                          return (
-                            <div key={qIdx} className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
-                              <div className="flex items-start justify-between gap-3 mb-4">
-                                <div>
-                                  <p className="text-sm font-bold text-slate-800">Q{qIdx + 1}. {q.question}</p>
-                                  {!state?.isAnswered && (
-                                    <span className="inline-block mt-2 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Unanswered</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {q.options.map((option, oIdx) => {
-                                  const isSelected = selectedOption === oIdx;
-                                  const isOptionCorrect = oIdx === q.correctAnswer;
-
-                                  let style = "border-slate-200 bg-white";
-                                  if (isOptionCorrect) style = "border-emerald-400 bg-emerald-50";
-                                  if (isSelected && !isOptionCorrect) style = "border-rose-400 bg-rose-50";
-                                  if (!isSelected && !isOptionCorrect && selectedOption !== null) style = "border-slate-100 bg-white opacity-70";
-
-                                  return (
-                                    <div key={oIdx} className={`p-4 rounded-xl border-2 text-sm ${style}`}>
-                                      <div className="flex items-center gap-2">
-                                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold ${isOptionCorrect ? 'border-emerald-500 text-emerald-600' : isSelected ? 'border-rose-500 text-rose-600' : 'border-slate-300 text-slate-400'}`}>
-                                          {String.fromCharCode(65 + oIdx)}
-                                        </span>
-                                        <span className="text-slate-700">{option}</span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="mt-4 text-xs text-slate-500">
-                                <span className={`font-bold ${isCorrect ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                  {isCorrect ? 'Correct' : state?.isAnswered ? 'Incorrect' : 'Not Answered'}
-                                </span>
-                                <span className="mx-2">•</span>
-                                <span className="text-slate-600">{q.explanation}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <SessionList
+              sessions={pastSessions}
+              savedUploads={savedUploads}
+              onReattempt={onReattemptSession}
+              onOpenUpload={onOpenUpload}
+            />
           )}
+
         </div>
-      )}
+      )
+      }
 
       <div className="space-y-6">
         {(() => {
@@ -406,73 +282,73 @@ export const QuizView: React.FC<QuizViewProps> = ({
                   </div>
                 )}
                 <div className={`bg-white rounded-3xl border transition-all p-8 relative ${status.isAnswered ? 'border-slate-100 shadow-sm' : 'border-slate-200 shadow-md'}`}>
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${status.isAnswered ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
-                    {qIdx + 1}
-                  </span>
-                  <h3 className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{q.question}</h3>
-                </div>
-                <button 
-                  onClick={() => toggleFlag(qIdx)}
-                  className={`p-2 rounded-lg transition-all ${status.isFlagged ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}
-                >
-                  <Flag size={20} fill={status.isFlagged ? "currentColor" : "none"} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {q.options.map((option, oIdx) => {
-                  const isSelected = status.selectedOption === oIdx;
-                  const isCorrect = oIdx === q.correctAnswer;
-                  const showFeedback = status.isAnswered;
-
-                  let style = "border-slate-200 hover:border-indigo-200 hover:bg-slate-50";
-                  if (isSelected) style = "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-100";
-                  if (showFeedback) {
-                    if (isCorrect) style = "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100";
-                    else if (isSelected) style = "border-rose-500 bg-rose-50 ring-2 ring-rose-100";
-                    else style = "border-slate-100 opacity-50";
-                  }
-
-                  return (
-                    <button
-                      key={oIdx}
-                      disabled={status.isAnswered}
-                      onClick={() => handleOptionSelect(qIdx, oIdx)}
-                      className={`p-5 rounded-2xl border-2 text-left transition-all flex items-center gap-4 group ${style}`}
-                    >
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
-                        {isSelected && <Check size={14} className="text-white" />}
-                      </div>
-                      <span className={`text-base font-medium ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
-                        {option}
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${status.isAnswered ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                        {qIdx + 1}
                       </span>
+                      <h3 className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{q.question}</h3>
+                    </div>
+                    <button
+                      onClick={() => toggleFlag(qIdx)}
+                      className={`p-2 rounded-lg transition-all ${status.isFlagged ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}
+                    >
+                      <Flag size={20} fill={status.isFlagged ? "currentColor" : "none"} />
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
 
-              {status.showExplanation && (
-                <div className="mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 animate-slide-up">
-                  <div className="flex gap-4 mb-4">
-                    <div className={`p-2 rounded-lg h-fit ${status.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                      {status.isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-800 mb-1">
-                        {status.isCorrect ? 'Correct!' : `The correct answer is "${q.options[q.correctAnswer]}".`}
-                      </h4>
-                      <p className="text-slate-600 text-sm leading-relaxed">{q.explanation}</p>
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {q.options.map((option, oIdx) => {
+                      const isSelected = status.selectedOption === oIdx;
+                      const isCorrect = oIdx === q.correctAnswer;
+                      const showFeedback = status.isAnswered;
+
+                      let style = "border-slate-200 hover:border-indigo-200 hover:bg-slate-50";
+                      if (isSelected) style = "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-100";
+                      if (showFeedback) {
+                        if (isCorrect) style = "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100";
+                        else if (isSelected) style = "border-rose-500 bg-rose-50 ring-2 ring-rose-100";
+                        else style = "border-slate-100 opacity-50";
+                      }
+
+                      return (
+                        <button
+                          key={oIdx}
+                          disabled={status.isAnswered}
+                          onClick={() => handleOptionSelect(qIdx, oIdx)}
+                          className={`p-5 rounded-2xl border-2 text-left transition-all flex items-center gap-4 group ${style}`}
+                        >
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                            {isSelected && <Check size={14} className="text-white" />}
+                          </div>
+                          <span className={`text-base font-medium ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
+                            {option}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200">
-                    <Sparkles className="text-indigo-500" size={16} />
-                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Clinical Pearl</span>
-                  </div>
-                </div>
-              )}
+
+                  {status.showExplanation && (
+                    <div className="mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 animate-slide-up">
+                      <div className="flex gap-4 mb-4">
+                        <div className={`p-2 rounded-lg h-fit ${status.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                          {status.isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-800 mb-1">
+                            {status.isCorrect ? 'Correct!' : `The correct answer is "${q.options[q.correctAnswer]}".`}
+                          </h4>
+                          <p className="text-slate-600 text-sm leading-relaxed">{q.explanation}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200">
+                        <Sparkles className="text-indigo-500" size={16} />
+                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Clinical Pearl</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </React.Fragment>
             );
@@ -486,23 +362,23 @@ export const QuizView: React.FC<QuizViewProps> = ({
           </div>
         )}
       </div>
-      
+
       <div className="flex flex-col sm:flex-row justify-center gap-4 pt-8">
-        <button 
+        <button
           onClick={onKeepGoing}
           disabled={isExtending}
           className="px-8 py-5 bg-white text-indigo-600 border-2 border-indigo-100 rounded-2xl font-bold text-lg hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
         >
-           {isExtending ? <Loader2 size={24} className="animate-spin" /> : <Sparkles size={24} />}
-           Request More Cases
+          {isExtending ? <Loader2 size={24} className="animate-spin" /> : <Sparkles size={24} />}
+          Request More Cases
         </button>
-        <button 
+        <button
           onClick={finalizeSession}
           className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
         >
           Finish Board Review
         </button>
       </div>
-    </div>
+    </div >
   );
 };
