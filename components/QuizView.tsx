@@ -78,7 +78,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
       showExplanation: false,
     })));
     setIsSubmitted(false);
-  }, [resetKey, safeQuestions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   const stats = useMemo(() => {
     const answered = sessionStates.filter(s => s.isAnswered).length;
