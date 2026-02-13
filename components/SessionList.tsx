@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QuizSession, SavedUpload } from '../types';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     CheckCircle2,
     XCircle,
@@ -58,7 +59,7 @@ export const SessionList: React.FC<SessionListProps> = ({
     }
 
     return (
-        <div className="divide-y divide-slate-100">
+        <motion.div layout className="divide-y divide-slate-100">
             {sessions.map((session) => {
                 const upload = getUploadForSession(session);
                 const isExpanded = expandedSessionId === session.id;
@@ -67,11 +68,13 @@ export const SessionList: React.FC<SessionListProps> = ({
                     : (upload?.material?.quiz || []);
                 const hasQuestions = sessionQuestions.length > 0;
                 const hasReview = hasQuestions && Array.isArray(session.questionStates) && session.questionStates.length > 0;
-                // Review is toggleable even if "hasReview" is false, so we can show the "missing data" message
-                // This was fixed in previous step logic.
 
                 return (
-                    <div key={session.id} className="px-5 py-4 hover:bg-slate-50/50 transition-colors">
+                    <motion.div
+                        layout
+                        key={session.id}
+                        className="px-5 py-4 hover:bg-slate-50/50 transition-colors"
+                    >
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
                                 <p className="font-semibold text-slate-700 text-sm md:text-base">{session.topic}</p>
@@ -126,69 +129,80 @@ export const SessionList: React.FC<SessionListProps> = ({
                             </div>
                         </div>
 
-                        {isExpanded && (
-                            <div className="mt-4 space-y-4 animate-fade-in">
-                                {!hasQuestions && (
-                                    <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-500 text-center italic border border-slate-100">
-                                        This session doesn’t have stored questions to review. Reattempt to regenerate a reviewable quiz.
-                                    </div>
-                                )}
-                                {hasQuestions && !hasReview && (
-                                    <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-500 text-center italic border border-slate-100">
-                                        Answer history isn’t available for this session. You can reattempt to generate a new review.
-                                    </div>
-                                )}
-                                {hasReview && sessionQuestions.map((q, qIdx) => {
-                                    const state = session.questionStates[qIdx];
-                                    const selectedOption = state?.selectedOption ?? null;
-                                    const isCorrect = state?.isCorrect ?? null;
-
-                                    return (
-                                        <div key={qIdx} className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                                            <div className="flex items-start justify-between gap-3 mb-3">
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800"><span className="text-indigo-500 mr-2">Q{qIdx + 1}</span> {q.question}</p>
-                                                    {!state?.isAnswered && (
-                                                        <span className="inline-block mt-2 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Unanswered</span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-1 gap-2">
-                                                {q.options.map((option, oIdx) => {
-                                                    const isSelected = selectedOption === oIdx;
-                                                    const isOptionCorrect = oIdx === q.correctAnswer;
-
-                                                    let style = "border-slate-200 bg-white";
-                                                    if (isOptionCorrect) style = "border-emerald-400 bg-emerald-50";
-                                                    if (isSelected && !isOptionCorrect) style = "border-rose-400 bg-rose-50";
-                                                    if (!isSelected && !isOptionCorrect && selectedOption !== null) style = "border-slate-100 bg-white opacity-70";
-
-                                                    return (
-                                                        <div key={oIdx} className={`p-3 rounded-xl border text-xs ${style}`}>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0 ${isOptionCorrect ? 'border-emerald-500 text-emerald-600' : isSelected ? 'border-rose-500 text-rose-600' : 'border-slate-300 text-slate-400'}`}>
-                                                                    {String.fromCharCode(65 + oIdx)}
-                                                                </span>
-                                                                <span className="text-slate-700">{option}</span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-500 flex items-start gap-2">
-                                                <div className={`mt-0.5 shrink-0 ${isCorrect ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                    {isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                                </div>
-                                                <span className="text-slate-600 leading-relaxed"><span className="font-bold">Explanation:</span> {q.explanation}</span>
-                                            </div>
+                        <AnimatePresence>
+                            {isExpanded && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="mt-4 space-y-4 overflow-hidden"
+                                >
+                                    {!hasQuestions && (
+                                        <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-500 text-center italic border border-slate-100">
+                                            This session doesn’t have stored questions to review. Reattempt to regenerate a reviewable quiz.
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                                    )}
+                                    {hasQuestions && !hasReview && (
+                                        <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-500 text-center italic border border-slate-100">
+                                            Answer history isn’t available for this session. You can reattempt to generate a new review.
+                                        </div>
+                                    )}
+                                    {hasReview && sessionQuestions.map((q, qIdx) => {
+                                        const state = session.questionStates[qIdx];
+                                        const selectedOption = state?.selectedOption ?? null;
+                                        const isCorrect = state?.isCorrect ?? null;
+
+                                        return (
+                                            <motion.div
+                                                layout
+                                                key={qIdx}
+                                                className="bg-slate-50 border border-slate-100 rounded-2xl p-4"
+                                            >
+                                                <div className="flex items-start justify-between gap-3 mb-3">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-800"><span className="text-indigo-500 mr-2">Q{qIdx + 1}</span> {q.question}</p>
+                                                        {!state?.isAnswered && (
+                                                            <span className="inline-block mt-2 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Unanswered</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {q.options.map((option, oIdx) => {
+                                                        const isSelected = selectedOption === oIdx;
+                                                        const isOptionCorrect = oIdx === q.correctAnswer;
+
+                                                        let style = "border-slate-200 bg-white";
+                                                        if (isOptionCorrect) style = "border-emerald-400 bg-emerald-50";
+                                                        if (isSelected && !isOptionCorrect) style = "border-rose-400 bg-rose-50";
+                                                        if (!isSelected && !isOptionCorrect && selectedOption !== null) style = "border-slate-100 bg-white opacity-70";
+
+                                                        return (
+                                                            <div key={oIdx} className={`p-3 rounded-xl border text-xs ${style}`}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0 ${isOptionCorrect ? 'border-emerald-500 text-emerald-600' : isSelected ? 'border-rose-500 text-rose-600' : 'border-slate-300 text-slate-400'}`}>
+                                                                        {String.fromCharCode(65 + oIdx)}
+                                                                    </span>
+                                                                    <span className="text-slate-700">{option}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-500 flex items-start gap-2">
+                                                    <div className={`mt-0.5 shrink-0 ${isCorrect ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                        {isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                                    </div>
+                                                    <span className="text-slate-600 leading-relaxed"><span className="font-bold">Explanation:</span> {q.explanation}</span>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </motion.div>
                 );
             })}
-        </div>
+        </motion.div>
     );
 };

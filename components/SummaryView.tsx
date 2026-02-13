@@ -244,7 +244,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
                 {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               </button>
               {isExpanded && (
-                <div className="px-4 md:px-5 py-3 md:py-4 bg-white border-t border-slate-200 text-slate-700 whitespace-pre-wrap leading-relaxed text-sm md:text-base">
+                <div className="px-4 md:px-5 py-3 md:py-4 bg-white border-t border-slate-200 text-slate-700 whitespace-pre-wrap leading-relaxed text-sm md:text-base font-medium">
                   {section.content}
                 </div>
               )}

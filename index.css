@@ -6,9 +6,35 @@
   color-scheme: light;
 }
 
+html,
 body {
-  font-family: 'Inter', sans-serif;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Manrope', 'Inter', sans-serif;
   background-color: #f8fafc;
+  color: #334155;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-heading {
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .perspective-1000 {
@@ -47,6 +73,7 @@ body {
 
 /* Mobile Optimizations */
 @media (max-width: 768px) {
+
   /* Larger touch targets for mobile */
   button {
     min-height: 44px;
@@ -82,9 +109,19 @@ body {
   }
 
   /* Better mobile typography */
-  h1 { font-size: 1.75rem; letter-spacing: -0.025em; }
-  h2 { font-size: 1.5rem; letter-spacing: -0.025em; }
-  h3 { font-size: 1.25rem; }
+  h1 {
+    font-size: 1.75rem;
+    letter-spacing: -0.025em;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    letter-spacing: -0.025em;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+  }
 
   /* Responsive table wrapper */
   .table-container {
@@ -103,7 +140,10 @@ body {
   }
 
   /* Prevent text zoom on double-tap */
-  button, input, select, textarea {
+  button,
+  input,
+  select,
+  textarea {
     -webkit-user-select: none;
     user-select: none;
     touch-action: manipulation;

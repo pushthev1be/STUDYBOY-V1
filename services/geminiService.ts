@@ -2,6 +2,8 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
+declare const process: { env: { [key: string]: string | undefined } };
+
 // Domain-specific system instructions with effective study guide framework
 const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
   'PA': `You are a Senior PA School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
@@ -95,22 +97,18 @@ const FALLBACK_QUIZ: QuizQuestion[] = [
   }
 ];
 
-const STUDY_MATERIAL_SCHEMA = {
+const SUMMARY_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     title: { type: Type.STRING, description: "A concise title" },
-    summary: { type: Type.STRING, description: "Pedagogical summary of high-yield medical concepts" },
-    flashcards: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          question: { type: Type.STRING },
-          answer: { type: Type.STRING }
-        },
-        required: ["question", "answer"]
-      }
-    },
+    summary: { type: Type.STRING, description: "Pedagogical summary of high-yield medical concepts" }
+  },
+  required: ["title", "summary"]
+};
+
+const QUIZ_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
     quiz: {
       type: Type.ARRAY,
       items: {
@@ -123,15 +121,34 @@ const STUDY_MATERIAL_SCHEMA = {
           },
           correctAnswer: { type: Type.INTEGER },
           explanation: { type: Type.STRING },
-          subtopic: { type: Type.STRING, description: "Short subtopic heading for grouping (e.g. Pathophysiology, Pharmacology)" }
+          subtopic: { type: Type.STRING, description: "Short subtopic heading for grouping" }
         },
         required: ["question", "options", "correctAnswer", "explanation", "subtopic"]
       }
     }
   },
-  required: ["title", "summary", "flashcards", "quiz"]
+  required: ["quiz"]
 };
 
+const FLASHCARDS_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    flashcards: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          question: { type: Type.STRING },
+          answer: { type: Type.STRING }
+        },
+        required: ["question", "answer"]
+      }
+    }
+  },
+  required: ["flashcards"]
+};
+
+// Backwards compatibility for other functions
 const ADDITIONAL_QUESTIONS_SCHEMA = {
   type: Type.ARRAY,
   items: {
@@ -206,29 +223,9 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const model = 'gemini-3-flash-preview';
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
-  const prompt = isImage
-    ? `Analyze this clinical image. Generate a structured study guide with:
-- Big Picture Question
-- Key Concepts & Definitions (term | definition)
-- Comparison Table (| delimiters)
-- Test Yourself (2-3 questions)
-- Common Misconception
-
-Also generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology") and 15 flashcard pairs.`
-    : `Analyze these notes and generate a structured study guide with:
-- Big Picture Question
-- Key Concepts & Definitions (term | definition)
-- Comparison Table (| delimiters)
-- Test Yourself (2-3 questions)
-- Common Misconception
-
-NOTES:
-${content}
-
-Generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology", "Pharmacology", "Diagnosis") and 15 flashcard pairs.`;
-
-  try {
-    return await retryWithBackoff(async () => {
+  // Helper to generate a specific part of the material
+  const generatePart = async (prompt: string, schema: any): Promise<any> => {
+    return retryWithBackoff(async () => {
       const response = await ai.models.generateContent({
         model,
         contents: isImage
@@ -237,18 +234,47 @@ Generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology",
         config: {
           systemInstruction: systemInstruction,
           responseMimeType: "application/json",
-          responseSchema: STUDY_MATERIAL_SCHEMA,
-          maxOutputTokens: 8000,
+          responseSchema: schema,
+          maxOutputTokens: 2000,
           thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
-
-      const result = JSON.parse(response.text || '{}') as StudyMaterial;
-      if (!result.title || !result.summary) throw new Error("Invalid response structure");
-      return result;
+      return JSON.parse(response.text || '{}');
     });
+  };
+
+  try {
+    // Fire all three requests in parallel
+    const [summaryPart, quizPart, flashcardsPart] = await Promise.all([
+      generatePart(
+        `Generate a concise title and a pedagogical summary of the following content:
+        
+        ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
+        SUMMARY_SCHEMA
+      ),
+      generatePart(
+        `Generate 15 high-yield, board-style quiz questions based on the following content. 
+        Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology", "Diagnosis").
+        
+        ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
+        QUIZ_SCHEMA
+      ),
+      generatePart(
+        `Generate 15 high-yield clinical flashcard pairs based on the following content.
+        
+        ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
+        FLASHCARDS_SCHEMA
+      )
+    ]);
+
+    return {
+      title: summaryPart.title || "Study Material",
+      summary: summaryPart.summary || "Summary generation failed.",
+      quiz: quizPart.quiz || [],
+      flashcards: flashcardsPart.flashcards || []
+    };
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini Parallel Processing Error:", error);
     return FALLBACK_STUDY_MATERIAL;
   }
 }

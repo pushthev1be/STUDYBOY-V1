@@ -9,6 +9,8 @@ import { QuizView } from './components/QuizView';
 import { AchievementsView } from './components/AchievementsView';
 import { SessionList } from './components/SessionList';
 import { AuthView } from './components/AuthView';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useWindowSize } from 'react-use';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
@@ -97,6 +99,8 @@ const App: React.FC = () => {
   const [savedUploads, setSavedUploads] = useState<SavedUpload[]>([]);
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
   const [quizResetKey, setQuizResetKey] = useState<string>('');
+  const { width } = useWindowSize();
+  const isMobile = width < 768;
 
   useEffect(() => {
     let interval: number;
@@ -528,10 +532,10 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f9fafb] text-slate-900 flex flex-col">
       {showNotification && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-slide-down border border-slate-700">
-          <div className="bg-amber-500 p-2 rounded-lg"><Trophy size={20} className="text-white" /></div>
-          <span className="font-bold">{showNotification}</span>
-          <button onClick={() => setShowNotification(null)} className="ml-2 hover:text-slate-400"><X size={16} /></button>
+        <div className="fixed top-24 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md z-[100] bg-slate-900 text-white px-4 md:px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 md:gap-4 animate-slide-down border border-slate-700">
+          <div className="bg-amber-500 p-2 rounded-lg shrink-0"><Trophy size={20} className="text-white" /></div>
+          <span className="font-bold text-sm md:text-base">{showNotification}</span>
+          <button onClick={() => setShowNotification(null)} className="ml-auto md:ml-2 hover:text-slate-400 p-1"><X size={16} /></button>
         </div>
       )}
 
@@ -586,14 +590,19 @@ const App: React.FC = () => {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24">
         {state === AppState.IDLE && (
-          <div className="max-w-3xl mx-auto text-center animate-fade-in">
+          <motion.div
+            layout
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="max-w-3xl mx-auto text-center animate-fade-in"
+          >
             <div className="mb-8 md:mb-12">
               <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 mb-4 md:mb-6 leading-tight">Crush your rotations, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">{user?.username}</span></h2>
               <p className="text-base md:text-xl text-slate-500 max-w-xl mx-auto leading-relaxed">Upload study materials and generate smart study content tailored to your field.</p>
             </div>
 
             {/* Domain Selector */}
-            <div className="mb-8 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <motion.div layout className="mb-8 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
               <label className="block text-sm font-bold text-slate-700 mb-4">What are you studying for?</label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {(['PA', 'Nursing', 'Medical', 'GenEd'] as const).map((domain) => (
@@ -612,9 +621,9 @@ const App: React.FC = () => {
                   </button>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
-            <div className="relative group">
+            <motion.div layout className="relative group">
               <label className="flex flex-col items-center justify-center w-full h-64 md:h-80 border-2 border-dashed border-slate-300 rounded-[2rem] md:rounded-[3rem] bg-white hover:bg-slate-50 hover:border-indigo-400 transition-all cursor-pointer shadow-sm">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <div className="bg-slate-100 p-6 rounded-full mb-6 group-hover:scale-110 group-hover:bg-indigo-50 transition-all duration-300"><Upload className="text-slate-400 group-hover:text-indigo-500" size={48} /></div>
@@ -623,38 +632,46 @@ const App: React.FC = () => {
                 </div>
                 <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md,image/*" />
               </label>
-            </div>
+            </motion.div>
 
-            {savedUploads.length > 0 && (
-              <div className="mt-10 bg-white rounded-2xl border border-slate-200 p-6 text-left shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <History size={18} className="text-indigo-500" />
-                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Previous Uploads</h3>
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{savedUploads.length}</span>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {savedUploads.slice(0, 6).map((upload) => (
-                    <div key={upload.id} className="py-3 flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-slate-800 text-sm">{upload.title}</p>
-                        <p className="text-xs text-slate-400">
-                          {upload.fileName} • {upload.domain} • {new Date(upload.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleOpenUpload(upload)}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all"
-                      >
-                        Open
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <AnimatePresence>
+              {savedUploads.length > 0 && (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-10 bg-white rounded-2xl border border-slate-200 p-6 text-left shadow-sm overflow-hidden"
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <History size={18} className="text-indigo-500" />
+                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Previous Uploads</h3>
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{savedUploads.length}</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {savedUploads.slice(0, 6).map((upload) => (
+                      <motion.div layout key={upload.id} className="py-3 flex items-center justify-between gap-4 text-xs sm:text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-800 truncate">{upload.title}</p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {upload.fileName} • {upload.domain}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleOpenUpload(upload)}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all whitespace-nowrap"
+                        >
+                          Open
+                        </button>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {quizSessions.length > 0 && (
-              <div className="mt-10 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm text-left">
+              <motion.div layout className="mt-10 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm text-left">
                 <div className="p-6 border-b border-slate-100 flex items-center gap-2">
                   <History size={18} className="text-indigo-500" />
                   <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Past Quiz Sessions</h3>
@@ -668,16 +685,16 @@ const App: React.FC = () => {
                     onOpenUpload={handleOpenUpload}
                   />
                 </div>
-              </div>
+              </motion.div>
             )}
-            <div className="mt-16 flex items-center justify-center gap-12">
-              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-indigo-600 mb-1">{stats.streakDays}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Day Streak</div></div>
+            <motion.div layout className="mt-16 flex items-center justify-center gap-6 sm:gap-12">
+              <div className="flex flex-col items-center"><div className="text-2xl sm:text-4xl font-extrabold text-indigo-600 mb-1">{stats.streakDays}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Day Streak</div></div>
               <div className="w-px h-12 bg-slate-200"></div>
-              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Documents</div></div>
+              <div className="flex flex-col items-center"><div className="text-2xl sm:text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Documents</div></div>
               <div className="w-px h-12 bg-slate-200"></div>
-              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Practice Sets</div></div>
-            </div>
-          </div>
+              <div className="flex flex-col items-center"><div className="text-2xl sm:text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Practice Sets</div></div>
+            </motion.div>
+          </motion.div>
         )}
 
         {state === AppState.PROCESSING && (
@@ -722,7 +739,20 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {state === AppState.VIEWING && <div className="animate-fade-in"><div className="mb-8">{renderContent()}</div></div>}
+        {state === AppState.VIEWING && (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={viewMode}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="animate-fade-in"
+            >
+              <div className="mb-8">{renderContent()}</div>
+            </motion.div>
+          </AnimatePresence>
+        )}
       </main>
 
       <footer className="bg-transparent py-8 mt-auto border-t border-slate-200/50">

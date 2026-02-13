@@ -17,6 +17,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { SessionList } from './SessionList';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface QuizViewProps {
   questions: QuizQuestion[];
@@ -150,14 +151,19 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
   if (isSubmitted) {
     return (
-      <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden animate-fade-in mb-20">
-        <div className="bg-indigo-600 p-12 text-center text-white">
-          <Award className="mx-auto mb-6 opacity-80" size={64} />
-          <h2 className="text-4xl font-bold mb-2">Round Complete</h2>
-          <p className="text-indigo-100 text-lg">PANCE prep takes persistence.</p>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="max-w-4xl mx-auto bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-100 overflow-hidden animate-fade-in mb-20 overflow-x-hidden"
+      >
+        <div className="bg-indigo-600 p-8 md:p-12 text-center text-white">
+          <Award className="mx-auto mb-4 md:mb-6 opacity-80 w-12 h-12 md:w-16 md:h-16" />
+          <h2 className="text-2xl md:text-4xl font-bold mb-2">Round Complete</h2>
+          <p className="text-indigo-100 text-base md:text-lg">PANCE prep takes persistence.</p>
         </div>
-        <div className="p-12">
-          <div className="grid grid-cols-3 gap-2 md:gap-8 mb-8 md:mb-12">
+        <div className="p-6 md:p-12">
+          <div className="grid grid-cols-3 gap-3 md:gap-8 mb-8 md:mb-12">
             <div className="text-center p-3 md:p-6 bg-slate-50 rounded-2xl">
               <div className="text-lg md:text-3xl font-bold text-slate-800">{stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0}%</div>
               <div className="text-[10px] md:text-sm text-slate-500 font-medium whitespace-nowrap">Score</div>
@@ -173,17 +179,21 @@ export const QuizView: React.FC<QuizViewProps> = ({
           </div>
           <button
             onClick={restartSession}
-            className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2"
+            className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95"
           >
             <RotateCcw size={20} /> Restart Board Review
           </button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-32">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-32"
+    >
       <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-24 z-30">
         <div className="flex items-center gap-2 md:gap-4">
           <div className="bg-indigo-50 p-2 md:p-3 rounded-xl shrink-0">
@@ -364,6 +374,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
           Finish Board Review
         </button>
       </div>
-    </div >
+    </motion.div>
   );
 };
