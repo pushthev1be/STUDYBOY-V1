@@ -542,7 +542,7 @@ const App: React.FC = () => {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
-            <div className="bg-indigo-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-indigo-100"><BrainCircuit className="text-white" size={24} md:size={28} /></div>
+            <div className="bg-indigo-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-indigo-100"><BrainCircuit className="text-white w-6 h-6 md:w-7 md:h-7" /></div>
             <div className="hidden md:block">
               <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-slate-800">StudyGenius<span className="text-indigo-600">AI</span></h1>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
@@ -559,7 +559,7 @@ const App: React.FC = () => {
                 className="p-2 md:p-2.5 rounded-xl md:rounded-2xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
                 title="Back to Dashboard"
               >
-                <Home size={18} md:size={20} />
+                <Home className="w-[18px] h-[18px] md:w-5 md:h-5" />
               </button>
             )}
             {state === AppState.VIEWING && (
@@ -582,8 +582,8 @@ const App: React.FC = () => {
                 ))}
               </div>
             )}
-            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2 md:p-2.5 rounded-xl md:rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`} title="View Progress & Goals"><Trophy size={20} md:size={24} /></button>
-            <button onClick={handleLogout} className="p-2 md:p-2.5 rounded-xl md:rounded-2xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut size={20} md:size={24} /></button>
+            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2 md:p-2.5 rounded-xl md:rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`} title="View Progress & Goals"><Trophy className="w-5 h-5 md:w-6 md:h-6" /></button>
+            <button onClick={handleLogout} className="p-2 md:p-2.5 rounded-xl md:rounded-2xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut className="w-5 h-5 md:w-6 md:h-6" /></button>
           </div>
         </div>
       </header>
