@@ -235,11 +235,11 @@ export async function processStudyContent(content: string, isImage: boolean = fa
           contents: isImage
             ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
             : [{ parts: [{ text: prompt }] }],
+          system_instruction: systemInstruction,
           config: {
-            systemInstruction: systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema: schema,
-            maxOutputTokens: maxTokens
+            response_mime_type: "application/json",
+            response_schema: schema,
+            max_output_tokens: maxTokens
           },
         });
         return JSON.parse(response.text || '{}');
@@ -303,11 +303,11 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
       const response = await ai.models.generateContent({
         model,
         contents: [{ parts: [{ text: prompt }] }],
+        system_instruction: DEFAULT_SYSTEM_INSTRUCTION,
         config: {
-          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-          maxOutputTokens: 4000
+          response_mime_type: "application/json",
+          response_schema: ADDITIONAL_QUESTIONS_SCHEMA,
+          max_output_tokens: 4000
         },
       });
 
@@ -338,11 +338,11 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
       const response = await ai.models.generateContent({
         model,
         contents: [{ parts: [{ text: prompt }] }],
+        system_instruction: DEFAULT_SYSTEM_INSTRUCTION,
         config: {
-          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-          maxOutputTokens: 2000
+          response_mime_type: "application/json",
+          response_schema: ADDITIONAL_QUESTIONS_SCHEMA,
+          max_output_tokens: 2000
         },
       });
 
@@ -376,11 +376,11 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
       const response = await ai.models.generateContent({
         model,
         contents: [{ parts: [{ text: prompt }] }],
+        system_instruction: DEFAULT_SYSTEM_INSTRUCTION,
         config: {
-          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: FLASHCARDS_LIST_SCHEMA,
-          maxOutputTokens: 8000
+          response_mime_type: "application/json",
+          response_schema: FLASHCARDS_LIST_SCHEMA,
+          max_output_tokens: 8000
         },
       });
 
