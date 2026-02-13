@@ -18,14 +18,23 @@ import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 const INITIAL_ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_upload', title: 'Quick Starter', description: 'Upload your first study document.', icon: 'Zap', unlocked: false, requirement: 1, currentValue: 0 },
-  { id: 'quiz_master', title: 'Quiz Master', description: 'Complete 5 practice quizzes.', icon: 'Star', unlocked: false, requirement: 5, currentValue: 0 },
-  { id: 'perfectionist', title: 'Perfectionist', description: 'Get 100% on any practice quiz.', icon: 'Award', unlocked: false, requirement: 1, currentValue: 0 },
-  { id: 'reviewer', title: 'Diligent Student', description: 'Review 50 flashcards across your notes.', icon: 'BookOpen', unlocked: false, requirement: 50, currentValue: 0 },
-  { id: 'power_user', title: 'Study Genius', description: 'Generate 10 different study materials.', icon: 'Cpu', unlocked: false, requirement: 10, currentValue: 0 },
-  { id: 'night_owl', title: 'Night Owl', description: 'Study after midnight.', icon: 'Moon', unlocked: false, requirement: 1, currentValue: 0 },
-  { id: 'on_fire', title: 'On Fire', description: 'Maintain a 3-day study streak.', icon: 'Flame', unlocked: false, requirement: 3, currentValue: 0 },
-  { id: 'goal_getter', title: 'Goal Getter', description: 'Complete 10 daily goals.', icon: 'Target', unlocked: false, requirement: 10, currentValue: 0 },
+  // BRONZE
+  { id: 'first_upload', title: 'Quick Starter', description: 'Upload your first study document.', icon: 'Zap', rarity: 'bronze', unlocked: false, requirement: 1, currentValue: 0 },
+  { id: 'quiz_master', title: 'Quiz Master', description: 'Complete 5 practice quizzes.', icon: 'Star', rarity: 'bronze', unlocked: false, requirement: 5, currentValue: 0 },
+  { id: 'night_owl', title: 'Night Owl', description: 'Study after midnight. Living that vampire life.', icon: 'Moon', rarity: 'bronze', unlocked: false, requirement: 1, currentValue: 0 },
+  { id: 'domain_hopper', title: 'Polymath', description: 'Upload materials to 3 different study domains.', icon: 'Target', rarity: 'bronze', unlocked: false, requirement: 3, currentValue: 0 },
+
+  // SILVER
+  { id: 'perfectionist', title: 'Perfectionist', description: 'Get 100% on any practice quiz.', icon: 'Award', rarity: 'silver', unlocked: false, requirement: 1, currentValue: 0 },
+  { id: 'reviewer', title: 'Diligent Student', description: 'Review 50 flashcards across your notes.', icon: 'BookOpen', rarity: 'silver', unlocked: false, requirement: 50, currentValue: 0 },
+  { id: 'on_fire', title: 'On Fire', description: 'Maintain a 3-day study streak. Don\'t stop now!', icon: 'Flame', rarity: 'silver', unlocked: false, requirement: 3, currentValue: 0 },
+  { id: 'marathon_runner', title: 'Study Marathon', description: 'Study 5 times in a single day.', icon: 'Zap', rarity: 'silver', unlocked: false, requirement: 5, currentValue: 0 },
+
+  // GOLD
+  { id: 'power_user', title: 'Study Genius', description: 'Generate 10 different study materials.', icon: 'Cpu', rarity: 'gold', unlocked: false, requirement: 10, currentValue: 0 },
+  { id: 'legendary_streak', title: 'Living Legend', description: 'Maintain a 7-day study streak!', icon: 'Flame', rarity: 'gold', unlocked: false, requirement: 7, currentValue: 0 },
+  { id: 'encyclopedic', title: 'Big Brain Energy', description: 'Review 250 flashcards total.', icon: 'BookOpen', rarity: 'gold', unlocked: false, requirement: 250, currentValue: 0 },
+  { id: 'perfect_streak', title: 'Unstoppable', description: 'Get 3 perfect quizzes in a row.', icon: 'Award', rarity: 'gold', unlocked: false, requirement: 3, currentValue: 0 },
 ];
 
 const INITIAL_GOALS: StudyGoal[] = [
@@ -39,7 +48,10 @@ const INITIAL_STATS: UserStats = {
   totalFlashcardsViewed: 0,
   perfectQuizzes: 0,
   streakDays: 0,
-  lastActive: new Date().toISOString()
+  lastActive: new Date().toISOString(),
+  usedDomains: [],
+  dailyStudyCount: 0,
+  currentPerfectStreak: 0
 };
 
 // SM-2 Spaced Repetition Algorithm
@@ -95,6 +107,7 @@ const App: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
   const [goals, setGoals] = useState<StudyGoal[]>(INITIAL_GOALS);
   const [showNotification, setShowNotification] = useState<string | null>(null);
+  const [notificationRarity, setNotificationRarity] = useState<'bronze' | 'silver' | 'gold' | null>(null);
   const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
   const [savedUploads, setSavedUploads] = useState<SavedUpload[]>([]);
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
@@ -169,8 +182,12 @@ const App: React.FC = () => {
   const triggerAchievement = (id: string) => {
     setAchievements(prev => prev.map(a => {
       if (a.id === id && !a.unlocked) {
-        setShowNotification(`New Achievement: ${a.title}!`);
-        setTimeout(() => setShowNotification(null), 5000);
+        setNotificationRarity(a.rarity);
+        setShowNotification(`Unlocked ${a.rarity.toUpperCase()}: ${a.title}!`);
+        setTimeout(() => {
+          setShowNotification(null);
+          setNotificationRarity(null);
+        }, 5000);
         return { ...a, unlocked: true };
       }
       return a;
@@ -182,31 +199,52 @@ const App: React.FC = () => {
       const newStats = { ...prev };
       const now = new Date();
       const last = new Date(prev.lastActive);
-      if (now.toDateString() !== last.toDateString()) {
+      const isNewDay = now.toDateString() !== last.toDateString();
+
+      if (isNewDay) {
         const diffTime = Math.abs(now.getTime() - last.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         if (diffDays === 1) newStats.streakDays += 1;
         else if (diffDays > 1) newStats.streakDays = 1;
+        newStats.dailyStudyCount = 0; // Reset daily count
       }
 
+      newStats.dailyStudyCount += 1;
+
+      // Check simple achievements
       if (newStats.streakDays >= 3) triggerAchievement('on_fire');
+      if (newStats.streakDays >= 7) triggerAchievement('legendary_streak');
+
       const hours = now.getHours();
       if (hours >= 0 && hours < 5) triggerAchievement('night_owl');
+      if (newStats.dailyStudyCount >= 5) triggerAchievement('marathon_runner');
 
       if (type === 'upload') {
         newStats.totalUploads += 1;
+        const domain = payload?.domain as StudyDomain;
+        if (domain && !newStats.usedDomains.includes(domain)) {
+          newStats.usedDomains.push(domain);
+        }
         if (newStats.totalUploads >= 1) triggerAchievement('first_upload');
         if (newStats.totalUploads >= 10) triggerAchievement('power_user');
+        if (newStats.usedDomains.length >= 3) triggerAchievement('domain_hopper');
       }
       if (type === 'quiz') {
         newStats.totalQuizzesCompleted += 1;
-        if (payload?.perfect) newStats.perfectQuizzes += 1;
+        if (payload?.perfect) {
+          newStats.perfectQuizzes += 1;
+          newStats.currentPerfectStreak += 1;
+          triggerAchievement('perfectionist');
+          if (newStats.currentPerfectStreak >= 3) triggerAchievement('perfect_streak');
+        } else {
+          newStats.currentPerfectStreak = 0;
+        }
         if (newStats.totalQuizzesCompleted >= 5) triggerAchievement('quiz_master');
-        if (payload?.perfect) triggerAchievement('perfectionist');
       }
       if (type === 'flashcard') {
         newStats.totalFlashcardsViewed += 1;
         if (newStats.totalFlashcardsViewed >= 50) triggerAchievement('reviewer');
+        if (newStats.totalFlashcardsViewed >= 250) triggerAchievement('encyclopedic');
       }
       return newStats;
     });
@@ -532,57 +570,64 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f9fafb] text-slate-900 flex flex-col">
       {showNotification && (
-        <div className="fixed top-24 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md z-[100] bg-slate-900 text-white px-4 md:px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 md:gap-4 animate-slide-down border border-slate-700">
-          <div className="bg-amber-500 p-2 rounded-lg shrink-0"><Trophy size={20} className="text-white" /></div>
+        <div className={`fixed top-24 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md z-[100] ${notificationRarity === 'gold' ? 'bg-amber-500 text-white' :
+            notificationRarity === 'silver' ? 'bg-slate-400 text-white' :
+              notificationRarity === 'bronze' ? 'bg-orange-700 text-white' :
+                'bg-slate-900 text-white'
+          } px-4 md:px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 md:gap-4 animate-slide-down border border-white/20`}>
+          <div className={`${notificationRarity === 'gold' ? 'bg-amber-400' :
+              notificationRarity === 'silver' ? 'bg-slate-300' :
+                notificationRarity === 'bronze' ? 'bg-orange-600' :
+                  'bg-indigo-500'
+            } p-2 rounded-lg shrink-0`}><Trophy size={20} className="text-white" /></div>
           <span className="font-bold text-sm md:text-base">{showNotification}</span>
-          <button onClick={() => setShowNotification(null)} className="ml-auto md:ml-2 hover:text-slate-400 p-1"><X size={16} /></button>
+          <button onClick={() => setShowNotification(null)} className="ml-auto md:ml-2 hover:opacity-70 p-1"><X size={16} /></button>
         </div>
       )}
 
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
-            <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-100"><BrainCircuit className="text-white" size={28} /></div>
-            <div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">StudyGenius<span className="text-indigo-600">AI</span></h1>
+        <div className="max-w-7xl mx-auto px-2 md:px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-1.5 md:gap-3">
+          <div className="flex items-center gap-1.5 md:gap-3 cursor-pointer shrink-0" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
+            <div className="bg-indigo-600 p-1.5 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-indigo-100 flex-shrink-0"><BrainCircuit className="text-white w-5 h-5 md:w-7 md:h-7" /></div>
+            <div className="hidden md:block">
+              <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-slate-800">StudyGenius<span className="text-indigo-600">AI</span></h1>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 md:gap-4 overflow-hidden">
             <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-tighter">
               <Zap size={14} fill="currentColor" /> Flash Engine Active
             </div>
             {state !== AppState.IDLE && (
               <button
                 onClick={() => setState(AppState.IDLE)}
-                className="p-2.5 rounded-2xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
+                className="p-2 md:p-2.5 rounded-xl md:rounded-2xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm shrink-0"
                 title="Back to Dashboard"
               >
-                <Home size={20} />
+                <Home size={18} className="md:w-5 md:h-5" />
               </button>
             )}
             {state === AppState.VIEWING && (
-              <div className="flex bg-slate-100 p-1 rounded-xl md:rounded-2xl gap-0.5 md:gap-1">
+              <div className="flex bg-slate-100 p-0.5 md:p-1 rounded-xl md:rounded-2xl gap-0.5 md:gap-1 overflow-hidden">
                 {[
                   { id: 'summary', label: 'Summary', icon: FileText },
                   { id: 'flashcards', label: 'Flashcards', icon: Layout },
                   { id: 'quiz', label: 'Quiz', icon: Sparkles },
-                  { id: 'stats', label: 'Progress', icon: Trophy }
                 ].map((mode) => (
                   <button
                     key={mode.id}
                     onClick={() => setViewMode(mode.id as ViewMode)}
-                    className={`flex items-center gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl font-semibold text-xs md:text-sm transition-all ${viewMode === mode.id ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                    className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-5 py-1.5 md:py-2.5 rounded-lg md:rounded-xl font-semibold text-xs transition-all shrink-0 ${viewMode === mode.id ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
                       }`}
                   >
-                    <mode.icon size={16} className="md:w-[18px] md:h-[18px]" />
+                    <mode.icon size={14} className="md:w-[18px] md:h-[18px]" />
                     <span className="hidden sm:inline">{mode.label}</span>
                   </button>
                 ))}
               </div>
             )}
-            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2.5 rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`} title="View Progress & Goals"><Trophy size={24} /></button>
+            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2 md:p-2.5 rounded-xl md:rounded-2xl transition-all shrink-0 ${viewMode === 'stats' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`} title="View Progress & Goals"><Trophy size={20} className="md:w-6 md:h-6" /></button>
             <button onClick={handleLogout} className="p-2.5 rounded-2xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut size={24} /></button>
           </div>
         </div>

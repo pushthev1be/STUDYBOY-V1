@@ -43,7 +43,8 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
-  icon: 'Zap' | 'Star' | 'Award' | 'BookOpen' | 'Cpu' | 'Moon' | 'Flame' | 'Target';
+  icon: 'Zap' | 'Star' | 'Award' | 'BookOpen' | 'Cpu' | 'Moon' | 'Flame' | 'Target' | 'Heart' | 'Stethoscope';
+  rarity: 'bronze' | 'silver' | 'gold';
   unlocked: boolean;
   requirement: number;
   currentValue: number;
@@ -63,6 +64,9 @@ export interface UserStats {
   perfectQuizzes: number;
   streakDays: number;
   lastActive: string;
+  usedDomains: string[];
+  dailyStudyCount: number;
+  currentPerfectStreak: number;
 }
 
 export enum AppState {
