@@ -48,7 +48,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
 
   const loadMore = async () => {
     if (isLoadingMore) return;
-    
+
     setIsLoadingMore(true);
     try {
       const { generateAdditionalFlashcards } = await import('../services/geminiService');
@@ -81,16 +81,16 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
   const currentCard = cards[currentIndex];
 
   return (
-    <div className="flex flex-col items-center space-y-8 py-12 max-w-lg mx-auto min-h-full">
-      <div className="text-slate-500 font-medium text-sm">
+    <div className="flex flex-col items-center space-y-4 md:space-y-8 py-6 md:py-12 max-w-lg mx-auto min-h-full px-4">
+      <div className="text-slate-500 font-medium text-xs md:text-sm">
         Card {currentIndex + 1} of {cards.length}
       </div>
 
-      <div 
+      <div
         role="button"
         tabIndex={0}
         aria-label={`Flashcard ${currentIndex + 1} of ${cards.length}. ${isFlipped ? 'Showing answer: ' + currentCard.answer : 'Showing question: ' + currentCard.question}. Press Space or Enter to flip. Use arrow keys to navigate.`}
-        className="relative w-full aspect-[4/3] perspective-1000 cursor-pointer group outline-none focus:ring-4 focus:ring-indigo-500 rounded-3xl"
+        className="relative w-full aspect-[4/5] md:aspect-[4/3] perspective-1000 cursor-pointer group outline-none focus:ring-4 focus:ring-indigo-500 rounded-2xl md:rounded-3xl"
         onClick={() => setIsFlipped(!isFlipped)}
         onKeyDown={(e) => {
           if (e.key === ' ' || e.key === 'Enter') {
@@ -101,31 +101,31 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
       >
         <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
           {/* Front */}
-          <div className="absolute inset-0 bg-white border-2 border-slate-100 rounded-3xl shadow-xl flex items-center justify-center p-8 backface-hidden">
+          <div className="absolute inset-0 bg-white border-2 border-slate-100 rounded-2xl md:rounded-3xl shadow-xl flex items-center justify-center p-6 md:p-8 backface-hidden">
             <div className="text-center">
-              <span className="text-indigo-500 font-bold uppercase tracking-wider text-xs mb-4 block">Question</span>
-              <p className="text-2xl font-semibold text-slate-800">{currentCard.question}</p>
+              <span className="text-indigo-500 font-bold uppercase tracking-wider text-[10px] md:text-xs mb-3 md:mb-4 block">Question</span>
+              <p className="text-xl md:text-2xl font-semibold text-slate-800">{currentCard.question}</p>
             </div>
-            <div className="absolute bottom-6 text-slate-400 text-sm flex items-center gap-2">
+            <div className="absolute bottom-6 text-slate-400 text-xs md:text-sm flex items-center gap-2">
               <RotateCcw size={16} /> Tap to reveal answer
             </div>
           </div>
 
           {/* Back */}
-          <div className="absolute inset-0 bg-indigo-600 border-2 border-indigo-500 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
-            <div className="text-center mb-6">
-              <span className="text-indigo-200 font-bold uppercase tracking-wider text-xs mb-4 block">Answer</span>
-              <p className="text-2xl font-medium text-white">{currentCard.answer}</p>
+          <div className="absolute inset-0 bg-indigo-600 border-2 border-indigo-500 rounded-2xl md:rounded-3xl shadow-xl flex flex-col items-center justify-center p-6 md:p-8 backface-hidden rotate-y-180">
+            <div className="text-center mb-4 md:mb-6">
+              <span className="text-indigo-200 font-bold uppercase tracking-wider text-[10px] md:text-xs mb-3 md:mb-4 block">Answer</span>
+              <p className="text-xl md:text-2xl font-medium text-white">{currentCard.answer}</p>
             </div>
             {isFlipped && (
-              <div className="flex gap-3 mt-4">
+              <div className="flex flex-wrap justify-center gap-2 md:gap-3 mt-4">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onCardRated?.(currentIndex, 1);
                     nextCard();
                   }}
-                  className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold transition-colors"
+                  className="px-4 py-2.5 md:px-3 md:py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold transition-colors"
                   title="Hard - Review soon"
                 >
                   Hard
@@ -136,7 +136,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
                     onCardRated?.(currentIndex, 2);
                     nextCard();
                   }}
-                  className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-xs font-bold transition-colors"
+                  className="px-4 py-2.5 md:px-3 md:py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-xs font-bold transition-colors"
                   title="Good - Review in a few days"
                 >
                   Good
@@ -147,7 +147,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
                     onCardRated?.(currentIndex, 3);
                     nextCard();
                   }}
-                  className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold transition-colors"
+                  className="px-4 py-2.5 md:px-3 md:py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold transition-colors"
                   title="Easy - Mastered"
                 >
                   Easy
@@ -159,15 +159,15 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
       </div>
 
       <div className="flex items-center gap-6">
-        <button 
+        <button
           onClick={prevCard}
-          className="p-4 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+          className="p-5 md:p-4 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
         >
           <ChevronLeft size={24} />
         </button>
-        <button 
+        <button
           onClick={nextCard}
-          className="p-4 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+          className="p-5 md:p-4 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
         >
           <ChevronRight size={24} />
         </button>
@@ -176,7 +176,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
       <button
         onClick={loadMore}
         disabled={isLoadingMore}
-        className="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+        className="mt-4 px-6 py-3.5 md:py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl md:rounded-lg font-bold md:font-medium transition-colors flex items-center gap-2"
       >
         <ChevronDown size={20} />
         {isLoadingMore ? 'Generating more...' : 'Load More Flashcards'}

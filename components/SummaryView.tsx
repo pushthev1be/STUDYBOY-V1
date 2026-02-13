@@ -29,7 +29,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       if (!line) {
         // Empty line - flush table if in progress
         if (isTable && tableLines.length > 0) {
@@ -92,7 +92,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
         }
         isTable = false;
         tableLines = [];
-        
+
         // Add this line to current section
         if (currentSection && (currentSection.type === 'section' || currentSection.type === 'misconception')) {
           currentSection.content = (currentSection.content || '') + (currentSection.content ? '\n' : '') + line;
@@ -155,33 +155,33 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 max-w-4xl mx-auto animate-fade-in space-y-6">
+    <div className="bg-white rounded-2xl md:shadow-sm border border-slate-100 p-5 md:p-8 max-w-4xl mx-auto animate-fade-in space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="border-b-2 border-indigo-200 pb-6">
-        <div className="flex items-start gap-3">
-          <BookOpen className="w-8 h-8 text-indigo-600 flex-shrink-0 mt-1" />
+      <div className="border-b-2 border-indigo-200 pb-4 md:pb-6">
+        <div className="flex items-start gap-2 md:gap-3">
+          <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-indigo-600 flex-shrink-0 mt-1" />
           <div>
-            <h1 className="text-4xl font-bold text-slate-800">{title}</h1>
-            <p className="text-slate-500 text-sm mt-1">📚 Effective Study Guide</p>
+            <h1 className="text-2xl md:text-4xl font-bold text-slate-800">{title}</h1>
+            <p className="text-slate-500 text-xs md:text-sm mt-1">📚 Effective Study Guide</p>
           </div>
         </div>
       </div>
 
       {/* Content Coverage Indicator */}
       {contentCoveragePercent && contentCoveragePercent < 100 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 md:p-5">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-blue-900 mb-2">Content Coverage: {contentCoveragePercent}%</p>
-              <div className="w-full bg-blue-200 rounded-full h-2.5">
-                <div 
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all" 
+              <p className="font-semibold text-blue-900 mb-2 text-sm md:text-base">Content Coverage: {contentCoveragePercent}%</p>
+              <div className="w-full bg-blue-200 rounded-full h-2 md:h-2.5">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 md:h-2.5 rounded-full transition-all"
                   style={{ width: `${contentCoveragePercent}%` }}
                 />
               </div>
-              <p className="text-xs text-blue-700 mt-3">
-                {hasUnprocessedContent 
+              <p className="text-[10px] md:text-xs text-blue-700 mt-2 md:mt-3">
+                {hasUnprocessedContent
                   ? '📚 More content available! Tap "Generate More" to create additional study materials.'
                   : '✓ All content processed.'}
               </p>
@@ -191,37 +191,37 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
       )}
 
       {/* Study Guide Sections */}
-      <div className="space-y-4">
+      <div className="space-y-3 md:space-y-4">
         {sections.map((section, idx) => {
           const isExpanded = expandedSections.has(idx);
 
           if (section.type === 'question') {
             return (
-              <div key={idx} className="bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-600 p-5 rounded">
-                <h3 className="font-bold text-lg text-purple-900 mb-2">❓ Key Question</h3>
-                <p className="text-purple-800">{section.content}</p>
+              <div key={idx} className="bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-600 p-4 md:p-5 rounded">
+                <h3 className="font-bold text-base md:text-lg text-purple-900 mb-2">❓ Key Question</h3>
+                <p className="text-sm md:text-base text-purple-800">{section.content}</p>
               </div>
             );
           }
 
           if (section.type === 'misconception') {
             return (
-              <div key={idx} className="bg-red-50 border-l-4 border-red-500 p-5 rounded">
-                <h3 className="font-bold text-lg text-red-900 mb-2">⚠️ Common Misconception</h3>
-                <p className="text-red-800 whitespace-pre-wrap">{section.content}</p>
+              <div key={idx} className="bg-red-50 border-l-4 border-red-500 p-4 md:p-5 rounded">
+                <h3 className="font-bold text-base md:text-lg text-red-900 mb-2">⚠️ Common Misconception</h3>
+                <p className="text-sm md:text-base text-red-800 whitespace-pre-wrap">{section.content}</p>
               </div>
             );
           }
 
           if (section.type === 'table') {
             return (
-              <div key={idx} className="border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full">
+              <div key={idx} className="table-container border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm md:text-base">
                   <tbody>
                     {section.tableData?.map((row, rowIdx) => (
                       <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-slate-50' : 'bg-white'}>
-                        <td className="px-4 py-3 font-semibold text-indigo-700 border-r border-slate-200">{row.left}</td>
-                        <td className="px-4 py-3 text-slate-700">{row.right}</td>
+                        <td className="px-3 md:px-4 py-3 font-semibold text-indigo-700 border-r border-slate-200 min-w-[120px]">{row.left}</td>
+                        <td className="px-3 md:px-4 py-3 text-slate-700">{row.right}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -232,19 +232,19 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
 
           // Collapsible sections
           return (
-            <div key={idx} className="border border-slate-200 rounded-lg overflow-hidden">
+            <div key={idx} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
               <button
                 onClick={() => toggleSection(idx)}
-                className="w-full px-5 py-4 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 text-left font-semibold text-slate-800 flex items-center justify-between transition-colors"
+                className="w-full px-4 md:px-5 py-3 md:py-4 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 text-left font-semibold text-slate-800 flex items-center justify-between transition-colors"
               >
-                <span className="flex items-center gap-2">
-                  {section.type === 'section' && <Target className="w-5 h-5 text-indigo-600" />}
+                <span className="flex items-center gap-2 text-sm md:text-base">
+                  {section.type === 'section' && <Target className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" />}
                   {section.title}
                 </span>
-                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               </button>
               {isExpanded && (
-                <div className="px-5 py-4 bg-white border-t border-slate-200 text-slate-700 whitespace-pre-wrap leading-relaxed">
+                <div className="px-4 md:px-5 py-3 md:py-4 bg-white border-t border-slate-200 text-slate-700 whitespace-pre-wrap leading-relaxed text-sm md:text-base">
                   {section.content}
                 </div>
               )}

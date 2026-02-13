@@ -157,18 +157,18 @@ export const QuizView: React.FC<QuizViewProps> = ({
           <p className="text-indigo-100 text-lg">PANCE prep takes persistence.</p>
         </div>
         <div className="p-12">
-          <div className="grid grid-cols-3 gap-8 mb-12">
-            <div className="text-center p-6 bg-slate-50 rounded-2xl">
-              <div className="text-3xl font-bold text-slate-800">{stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0}%</div>
-              <div className="text-sm text-slate-500 font-medium">Diagnostic Score</div>
+          <div className="grid grid-cols-3 gap-2 md:gap-8 mb-8 md:mb-12">
+            <div className="text-center p-3 md:p-6 bg-slate-50 rounded-2xl">
+              <div className="text-lg md:text-3xl font-bold text-slate-800">{stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0}%</div>
+              <div className="text-[10px] md:text-sm text-slate-500 font-medium whitespace-nowrap">Score</div>
             </div>
-            <div className="text-center p-6 bg-slate-50 rounded-2xl">
-              <div className="text-3xl font-bold text-slate-800">{stats.correct}/{stats.total}</div>
-              <div className="text-sm text-slate-500 font-medium">Cases Correct</div>
+            <div className="text-center p-3 md:p-6 bg-slate-50 rounded-2xl">
+              <div className="text-lg md:text-3xl font-bold text-slate-800">{stats.correct}/{stats.total}</div>
+              <div className="text-[10px] md:text-sm text-slate-500 font-medium whitespace-nowrap">Cases Correct</div>
             </div>
-            <div className="text-center p-6 bg-slate-50 rounded-2xl">
-              <div className="text-3xl font-bold text-slate-800">{stats.flagged}</div>
-              <div className="text-sm text-slate-500 font-medium">Review Later</div>
+            <div className="text-center p-3 md:p-6 bg-slate-50 rounded-2xl">
+              <div className="text-lg md:text-3xl font-bold text-slate-800">{stats.flagged}</div>
+              <div className="text-[10px] md:text-sm text-slate-500 font-medium whitespace-nowrap">Review Later</div>
             </div>
           </div>
           <button
@@ -185,19 +185,19 @@ export const QuizView: React.FC<QuizViewProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-32">
       <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-24 z-30">
-        <div className="flex items-center gap-4">
-          <div className="bg-indigo-50 p-3 rounded-xl">
-            <Stethoscope className="text-indigo-600" size={24} />
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="bg-indigo-50 p-2 md:p-3 rounded-xl shrink-0">
+            <Stethoscope className="text-indigo-600 w-5 h-5 md:w-6 md:h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Clinical Vignettes</h2>
-            <p className="text-sm text-slate-500">Board-style practice questions</p>
+            <h2 className="text-base md:text-xl font-bold text-slate-800 line-clamp-1">Clinical Vignettes</h2>
+            <p className="text-[10px] md:text-sm text-slate-500">Practice questions</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <div className="text-right hidden sm:block mr-2">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Questions Found</div>
-            <div className="text-sm font-bold text-indigo-600">{stats.answered} / {stats.total}</div>
+            <div className="text-xs md:text-sm font-bold text-indigo-600">{stats.answered} / {stats.total}</div>
           </div>
 
           {onKeepGoing && (
@@ -266,13 +266,13 @@ export const QuizView: React.FC<QuizViewProps> = ({
                     <div className="h-px flex-1 bg-indigo-100"></div>
                   </div>
                 )}
-                <div className={`bg-white rounded-3xl border transition-all p-8 relative ${status.isAnswered ? 'border-slate-100 shadow-sm' : 'border-slate-200 shadow-md'}`}>
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${status.isAnswered ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                <div className={`bg-white rounded-2xl md:rounded-3xl border transition-all p-5 md:p-8 relative ${status.isAnswered ? 'border-slate-100 shadow-sm' : 'border-slate-200 shadow-md'}`}>
+                  <div className="flex items-start justify-between mb-4 md:mb-6">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <span className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center font-bold text-xs md:text-sm ${status.isAnswered ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
                         {qIdx + 1}
                       </span>
-                      <h3 className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{q.question}</h3>
+                      <h3 className="text-base md:text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{q.question}</h3>
                     </div>
                     <button
                       onClick={() => toggleFlag(qIdx)}
@@ -301,12 +301,12 @@ export const QuizView: React.FC<QuizViewProps> = ({
                           key={oIdx}
                           disabled={status.isAnswered}
                           onClick={() => handleOptionSelect(qIdx, oIdx)}
-                          className={`p-5 rounded-2xl border-2 text-left transition-all flex items-center gap-4 group ${style}`}
+                          className={`p-4 md:p-5 rounded-xl md:rounded-2xl border-2 text-left transition-all flex items-center gap-3 md:gap-4 group ${style}`}
                         >
-                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
-                            {isSelected && <Check size={14} className="text-white" />}
+                          <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                            {isSelected && <Check size={12} className="text-white md:w-[14px] md:h-[14px]" />}
                           </div>
-                          <span className={`text-base font-medium ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
+                          <span className={`text-sm md:text-base font-medium ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
                             {option}
                           </span>
                         </button>

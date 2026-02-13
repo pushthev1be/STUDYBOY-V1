@@ -81,19 +81,32 @@ body {
     padding-right: 0.75rem;
   }
 
-  /* Better mobile text sizing */
-  h1 {
-    font-size: 1.875rem;
+  /* Better mobile typography */
+  h1 { font-size: 1.75rem; letter-spacing: -0.025em; }
+  h2 { font-size: 1.5rem; letter-spacing: -0.025em; }
+  h3 { font-size: 1.25rem; }
+
+  /* Responsive table wrapper */
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
   }
 
-  h2 {
-    font-size: 1.5rem;
+  /* Compact button spacing for mobile toolbar */
+  .mobile-toolbar button {
+    padding: 0.5rem;
+    min-width: 40px;
+    min-height: 40px;
   }
 
   /* Prevent text zoom on double-tap */
   button, input, select, textarea {
     -webkit-user-select: none;
     user-select: none;
+    touch-action: manipulation;
   }
 
   /* Smoother scroll on mobile */
