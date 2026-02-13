@@ -211,40 +211,14 @@ export const QuizView: React.FC<QuizViewProps> = ({
           </div>
 
           {onKeepGoing && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={onKeepGoing}
               disabled={isExtending}
-              className={`flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold hover:bg-indigo-50 transition-all disabled:opacity-50 ${isExtending ? 'cursor-not-allowed' : ''}`}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold hover:bg-indigo-50 transition-all disabled:opacity-50"
             >
-              <AnimatePresence mode="wait">
-                {isExtending ? (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0, rotate: -180 }}
-                    animate={{ opacity: 1, rotate: 0 }}
-                    exit={{ opacity: 0, rotate: 180 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Loader2 size={18} className="animate-spin text-indigo-600" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="icon"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <PlusCircle size={18} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <span className="text-xs md:text-sm">
-                {isExtending ? 'Extending...' : 'Extend Cases'}
-              </span>
-            </motion.button>
+              {isExtending ? <Loader2 size={18} className="animate-spin" /> : <PlusCircle size={18} />}
+              Extend Case Study
+            </button>
           )}
 
           <button

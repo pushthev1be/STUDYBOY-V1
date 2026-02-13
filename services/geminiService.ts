@@ -2,8 +2,6 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { StudyMaterial, QuizQuestion, StudyDomain } from "../types";
 
-declare const process: { env: { [key: string]: string | undefined } };
-
 // Domain-specific system instructions with effective study guide framework
 const DOMAIN_INSTRUCTIONS: Record<StudyDomain, string> = {
   'PA': `You are a Senior PA School Professor. YOUR ROLE: Generate structured study guides, not narrative essays.
@@ -97,18 +95,22 @@ const FALLBACK_QUIZ: QuizQuestion[] = [
   }
 ];
 
-const SUMMARY_SCHEMA = {
+const STUDY_MATERIAL_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     title: { type: Type.STRING, description: "A concise title" },
-    summary: { type: Type.STRING, description: "Pedagogical summary of high-yield medical concepts" }
-  },
-  required: ["title", "summary"]
-};
-
-const QUIZ_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
+    summary: { type: Type.STRING, description: "Pedagogical summary of high-yield medical concepts" },
+    flashcards: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          question: { type: Type.STRING },
+          answer: { type: Type.STRING }
+        },
+        required: ["question", "answer"]
+      }
+    },
     quiz: {
       type: Type.ARRAY,
       items: {
@@ -121,34 +123,15 @@ const QUIZ_SCHEMA = {
           },
           correctAnswer: { type: Type.INTEGER },
           explanation: { type: Type.STRING },
-          subtopic: { type: Type.STRING, description: "Short subtopic heading for grouping" }
+          subtopic: { type: Type.STRING, description: "Short subtopic heading for grouping (e.g. Pathophysiology, Pharmacology)" }
         },
         required: ["question", "options", "correctAnswer", "explanation", "subtopic"]
       }
     }
   },
-  required: ["quiz"]
+  required: ["title", "summary", "flashcards", "quiz"]
 };
 
-const FLASHCARDS_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    flashcards: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          question: { type: Type.STRING },
-          answer: { type: Type.STRING }
-        },
-        required: ["question", "answer"]
-      }
-    }
-  },
-  required: ["flashcards"]
-};
-
-// Backwards compatibility for other functions
 const ADDITIONAL_QUESTIONS_SCHEMA = {
   type: Type.ARRAY,
   items: {
@@ -219,82 +202,60 @@ async function retryWithBackoff<T>(
 }
 
 export async function processStudyContent(content: string, isImage: boolean = false, domain: StudyDomain = 'PA'): Promise<StudyMaterial> {
-  const ai = new GoogleGenAI({
-    apiKey: process.env.API_KEY || '',
-    apiVersion: 'v1'
-  });
-  const model = 'gemini-1.5-flash';
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const model = 'gemini-3-flash-preview';
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
-  // Helper to generate a specific part of the material
-  const generatePart = async (prompt: string, schema: any, maxTokens: number = 2000): Promise<any> => {
-    return retryWithBackoff(async () => {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: isImage
-            ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
-            : [{ parts: [{ text: prompt }] }],
-          system_instruction: systemInstruction,
-          config: {
-            response_mime_type: "application/json",
-            response_schema: schema,
-            max_output_tokens: maxTokens
-          },
-        });
-        return JSON.parse(response.text || '{}');
-      } catch (parseError) {
-        console.error("JSON Parse Error in generatePart:", parseError);
-        return {}; // Return empty object as fallback for this specific part
-      }
-    });
-  };
+  const prompt = isImage
+    ? `Analyze this clinical image. Generate a structured study guide with:
+- Big Picture Question
+- Key Concepts & Definitions (term | definition)
+- Comparison Table (| delimiters)
+- Test Yourself (2-3 questions)
+- Common Misconception
+
+Also generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology") and 15 flashcard pairs.`
+    : `Analyze these notes and generate a structured study guide with:
+- Big Picture Question
+- Key Concepts & Definitions (term | definition)
+- Comparison Table (| delimiters)
+- Test Yourself (2-3 questions)
+- Common Misconception
+
+NOTES:
+${content}
+
+Generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology", "Pharmacology", "Diagnosis") and 15 flashcard pairs.`;
 
   try {
-    // Fire all three requests in parallel
-    const [summaryPart, quizPart, flashcardsPart] = await Promise.all([
-      generatePart(
-        `Generate a concise title and a pedagogical summary of the following content:
-        
-        ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
-        SUMMARY_SCHEMA,
-        2000
-      ),
-      generatePart(
-        `Generate 15 high-yield, board-style quiz questions based on the following content. 
-        Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology", "Diagnosis").
-        
-        ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
-        QUIZ_SCHEMA,
-        8000
-      ),
-      generatePart(
-        `Generate 15 high-yield clinical flashcard pairs based on the following content.
-        
-        ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
-        FLASHCARDS_SCHEMA,
-        4000
-      )
-    ]);
+    return await retryWithBackoff(async () => {
+      const response = await ai.models.generateContent({
+        model,
+        contents: isImage
+          ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
+          : [{ parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: STUDY_MATERIAL_SCHEMA,
+          maxOutputTokens: 8000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+        },
+      });
 
-    return {
-      title: summaryPart.title || "Study Material",
-      summary: summaryPart.summary || "Summary generation failed.",
-      quiz: quizPart.quiz || [],
-      flashcards: flashcardsPart.flashcards || []
-    };
+      const result = JSON.parse(response.text || '{}') as StudyMaterial;
+      if (!result.title || !result.summary) throw new Error("Invalid response structure");
+      return result;
+    });
   } catch (error) {
-    console.error("Gemini Parallel Processing Error:", error);
+    console.error("Gemini API Error:", error);
     return FALLBACK_STUDY_MATERIAL;
   }
 }
 
 export async function extendQuiz(currentTopic: string, existingCount: number): Promise<QuizQuestion[]> {
-  const ai = new GoogleGenAI({
-    apiKey: process.env.API_KEY || '',
-    apiVersion: 'v1'
-  });
-  const model = 'gemini-1.5-flash';
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const model = 'gemini-3-flash-preview';
 
   const prompt = `Generate 5 new board-style questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology"). Vary difficulty and scenarios. Include clinical vignettes, plausible distractors, and concise explanations.`;
 
@@ -303,20 +264,16 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
       const response = await ai.models.generateContent({
         model,
         contents: [{ parts: [{ text: prompt }] }],
-        system_instruction: DEFAULT_SYSTEM_INSTRUCTION,
         config: {
-          response_mime_type: "application/json",
-          response_schema: ADDITIONAL_QUESTIONS_SCHEMA,
-          max_output_tokens: 4000
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
+          maxOutputTokens: 4000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
 
-      try {
-        return JSON.parse(response.text || '[]') as QuizQuestion[];
-      } catch (e) {
-        console.error("Quiz Extension Parse Error:", e);
-        return [];
-      }
+      return JSON.parse(response.text || '[]') as QuizQuestion[];
     });
   } catch (error) {
     console.error("Gemini Extension Error:", error);
@@ -325,11 +282,8 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
 }
 
 export async function generateQuestionForFailure(currentTopic: string): Promise<QuizQuestion[]> {
-  const ai = new GoogleGenAI({
-    apiKey: process.env.API_KEY || '',
-    apiVersion: 'v1'
-  });
-  const model = 'gemini-1.5-flash';
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const model = 'gemini-3-flash-preview';
 
   const prompt = `Student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different angles. Include a "subtopic" field, clinical vignettes, and explanations that clarify the misconception.`;
 
@@ -338,20 +292,16 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
       const response = await ai.models.generateContent({
         model,
         contents: [{ parts: [{ text: prompt }] }],
-        system_instruction: DEFAULT_SYSTEM_INSTRUCTION,
         config: {
-          response_mime_type: "application/json",
-          response_schema: ADDITIONAL_QUESTIONS_SCHEMA,
-          max_output_tokens: 2000
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
+          maxOutputTokens: 2000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
 
-      try {
-        return JSON.parse(response.text || '[]') as QuizQuestion[];
-      } catch (e) {
-        console.error("Failure Question Parse Error:", e);
-        return [];
-      }
+      return JSON.parse(response.text || '[]') as QuizQuestion[];
     });
   } catch (error) {
     console.error("Generate Question for Failure Error:", error);
@@ -360,11 +310,8 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
 }
 
 export async function generateAdditionalFlashcards(topic: string): Promise<any[]> {
-  const ai = new GoogleGenAI({
-    apiKey: process.env.API_KEY || '',
-    apiVersion: 'v1'
-  });
-  const model = 'gemini-1.5-flash';
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const model = 'gemini-3-flash-preview';
 
   const prompt = `Generate EXACTLY 15 new, unique flashcard pairs about: "${topic}". 
   Ensure they cover different aspects and vary in difficulty. 
@@ -376,21 +323,17 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
       const response = await ai.models.generateContent({
         model,
         contents: [{ parts: [{ text: prompt }] }],
-        system_instruction: DEFAULT_SYSTEM_INSTRUCTION,
         config: {
-          response_mime_type: "application/json",
-          response_schema: FLASHCARDS_LIST_SCHEMA,
-          max_output_tokens: 8000
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: FLASHCARDS_LIST_SCHEMA,
+          maxOutputTokens: 4000,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
       });
 
-      try {
-        const result = JSON.parse(response.text || '[]');
-        return Array.isArray(result) ? result : [];
-      } catch (e) {
-        console.error("Flashcard Load More Parse Error:", e);
-        return [];
-      }
+      const result = JSON.parse(response.text || '[]');
+      return Array.isArray(result) ? result : [];
     });
   } catch (error) {
     console.error("Generate Additional Flashcards Error:", error);

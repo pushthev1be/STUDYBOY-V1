@@ -541,29 +541,29 @@ const App: React.FC = () => {
 
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
-            <div className="bg-indigo-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-indigo-100"><BrainCircuit className="text-white w-6 h-6 md:w-7 md:h-7" /></div>
-            <div className="hidden md:block">
-              <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-slate-800">StudyGenius<span className="text-indigo-600">AI</span></h1>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
+            <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-100"><BrainCircuit className="text-white" size={28} /></div>
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">StudyGenius<span className="text-indigo-600">AI</span></h1>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 md:gap-4">
+          <div className="flex items-center gap-4">
             <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-tighter">
               <Zap size={14} fill="currentColor" /> Flash Engine Active
             </div>
             {state !== AppState.IDLE && (
               <button
                 onClick={() => setState(AppState.IDLE)}
-                className="p-2 md:p-2.5 rounded-xl md:rounded-2xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
+                className="p-2.5 rounded-2xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
                 title="Back to Dashboard"
               >
-                <Home className="w-[18px] h-[18px] md:w-5 md:h-5" />
+                <Home size={20} />
               </button>
             )}
             {state === AppState.VIEWING && (
-              <div className="flex bg-slate-100 p-0.5 md:p-1 rounded-lg md:rounded-2xl gap-0.5 md:gap-1">
+              <div className="flex bg-slate-100 p-1 rounded-xl md:rounded-2xl gap-0.5 md:gap-1">
                 {[
                   { id: 'summary', label: 'Summary', icon: FileText },
                   { id: 'flashcards', label: 'Flashcards', icon: Layout },
@@ -573,17 +573,17 @@ const App: React.FC = () => {
                   <button
                     key={mode.id}
                     onClick={() => setViewMode(mode.id as ViewMode)}
-                    className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-5 py-1.5 md:py-2.5 rounded-md md:rounded-xl font-semibold text-[10px] md:text-sm transition-all ${viewMode === mode.id ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                    className={`flex items-center gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl font-semibold text-xs md:text-sm transition-all ${viewMode === mode.id ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
                       }`}
                   >
-                    <mode.icon size={14} className="md:w-[18px] md:h-[18px]" />
+                    <mode.icon size={16} className="md:w-[18px] md:h-[18px]" />
                     <span className="hidden sm:inline">{mode.label}</span>
                   </button>
                 ))}
               </div>
             )}
-            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2 md:p-2.5 rounded-xl md:rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`} title="View Progress & Goals"><Trophy className="w-5 h-5 md:w-6 md:h-6" /></button>
-            <button onClick={handleLogout} className="p-2 md:p-2.5 rounded-xl md:rounded-2xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut className="w-5 h-5 md:w-6 md:h-6" /></button>
+            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2.5 rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`} title="View Progress & Goals"><Trophy size={24} /></button>
+            <button onClick={handleLogout} className="p-2.5 rounded-2xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut size={24} /></button>
           </div>
         </div>
       </header>
