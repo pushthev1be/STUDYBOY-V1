@@ -220,7 +220,7 @@ async function retryWithBackoff<T>(
 
 export async function processStudyContent(content: string, isImage: boolean = false, domain: StudyDomain = 'PA'): Promise<StudyMaterial> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  const model = 'gemini-3-flash-preview';
+  const model = 'gemini-1.5-flash';
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   // Helper to generate a specific part of the material
@@ -281,7 +281,7 @@ export async function processStudyContent(content: string, isImage: boolean = fa
 
 export async function extendQuiz(currentTopic: string, existingCount: number): Promise<QuizQuestion[]> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  const model = 'gemini-3-flash-preview';
+  const model = 'gemini-1.5-flash';
 
   const prompt = `Generate 5 new board-style questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology"). Vary difficulty and scenarios. Include clinical vignettes, plausible distractors, and concise explanations.`;
 
@@ -309,7 +309,7 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
 
 export async function generateQuestionForFailure(currentTopic: string): Promise<QuizQuestion[]> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  const model = 'gemini-3-flash-preview';
+  const model = 'gemini-1.5-flash';
 
   const prompt = `Student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different angles. Include a "subtopic" field, clinical vignettes, and explanations that clarify the misconception.`;
 
@@ -337,7 +337,7 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
 
 export async function generateAdditionalFlashcards(topic: string): Promise<any[]> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  const model = 'gemini-3-flash-preview';
+  const model = 'gemini-1.5-flash';
 
   const prompt = `Generate EXACTLY 15 new, unique flashcard pairs about: "${topic}". 
   Ensure they cover different aspects and vary in difficulty. 
