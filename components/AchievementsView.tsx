@@ -108,17 +108,17 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({ achievements
           <div className="grid grid-cols-1 gap-4">
             {achievements.map((achievement) => {
               const IconComp = ICON_MAP[achievement.icon] || Trophy;
-              const config = RARITY_CONFIG[achievement.rarity];
+              const config = RARITY_CONFIG[achievement.rarity] || RARITY_CONFIG.bronze;
 
               return (
                 <div
                   key={achievement.id}
                   className={`flex items-center gap-4 md:gap-6 p-5 rounded-3xl border transition-all ${achievement.unlocked
-                    ? `${config.bg} shadow-sm`
+                    ? `${config.bg || ''} shadow-sm`
                     : 'bg-slate-50 border-slate-200 grayscale opacity-40'
                     }`}
                 >
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${achievement.unlocked ? config.iconBg : 'bg-slate-200 text-slate-400'
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${achievement.unlocked ? (config.iconBg || '') : 'bg-slate-200 text-slate-400'
                     }`}>
                     <IconComp size={28} />
                   </div>

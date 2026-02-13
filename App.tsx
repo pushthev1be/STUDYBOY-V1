@@ -135,8 +135,29 @@ const App: React.FC = () => {
       setUser(JSON.parse(savedUser));
       setState(AppState.IDLE);
     }
-    if (savedStats) setStats(JSON.parse(savedStats));
-    if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
+    if (savedStats) {
+      const parsedStats = JSON.parse(savedStats);
+      setStats({
+        ...INITIAL_STATS,
+        ...parsedStats,
+        // Ensure arrays exist
+        usedDomains: Array.isArray(parsedStats.usedDomains) ? parsedStats.usedDomains : INITIAL_STATS.usedDomains,
+        lastActive: parsedStats.lastActive || INITIAL_STATS.lastActive
+      });
+    }
+
+    if (savedAchievements) {
+      const parsedAchievements = JSON.parse(savedAchievements) as Achievement[];
+      // Merge: keep unlock status for existing IDs, add new ones from INITIAL
+      setAchievements(INITIAL_ACHIEVEMENTS.map(initial => {
+        const saved = parsedAchievements.find(s => s.id === initial.id);
+        if (saved) {
+          return { ...initial, unlocked: saved.unlocked, currentValue: saved.currentValue || 0 };
+        }
+        return initial;
+      }));
+    }
+
     if (savedGoals) {
       const g = JSON.parse(savedGoals);
       const lastActive = savedStats ? JSON.parse(savedStats).lastActive : null;
@@ -209,7 +230,7 @@ const App: React.FC = () => {
         newStats.dailyStudyCount = 0; // Reset daily count
       }
 
-      newStats.dailyStudyCount += 1;
+      newStats.dailyStudyCount = (newStats.dailyStudyCount || 0) + 1;
 
       // Check simple achievements
       if (newStats.streakDays >= 3) triggerAchievement('on_fire');
@@ -222,6 +243,7 @@ const App: React.FC = () => {
       if (type === 'upload') {
         newStats.totalUploads += 1;
         const domain = payload?.domain as StudyDomain;
+        if (!Array.isArray(newStats.usedDomains)) newStats.usedDomains = [];
         if (domain && !newStats.usedDomains.includes(domain)) {
           newStats.usedDomains.push(domain);
         }
@@ -233,7 +255,7 @@ const App: React.FC = () => {
         newStats.totalQuizzesCompleted += 1;
         if (payload?.perfect) {
           newStats.perfectQuizzes += 1;
-          newStats.currentPerfectStreak += 1;
+          newStats.currentPerfectStreak = (newStats.currentPerfectStreak || 0) + 1;
           triggerAchievement('perfectionist');
           if (newStats.currentPerfectStreak >= 3) triggerAchievement('perfect_streak');
         } else {
@@ -571,14 +593,14 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#f9fafb] text-slate-900 flex flex-col">
       {showNotification && (
         <div className={`fixed top-24 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md z-[100] ${notificationRarity === 'gold' ? 'bg-amber-500 text-white' :
-            notificationRarity === 'silver' ? 'bg-slate-400 text-white' :
-              notificationRarity === 'bronze' ? 'bg-orange-700 text-white' :
-                'bg-slate-900 text-white'
+          notificationRarity === 'silver' ? 'bg-slate-400 text-white' :
+            notificationRarity === 'bronze' ? 'bg-orange-700 text-white' :
+              'bg-slate-900 text-white'
           } px-4 md:px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 md:gap-4 animate-slide-down border border-white/20`}>
           <div className={`${notificationRarity === 'gold' ? 'bg-amber-400' :
-              notificationRarity === 'silver' ? 'bg-slate-300' :
-                notificationRarity === 'bronze' ? 'bg-orange-600' :
-                  'bg-indigo-500'
+            notificationRarity === 'silver' ? 'bg-slate-300' :
+              notificationRarity === 'bronze' ? 'bg-orange-600' :
+                'bg-indigo-500'
             } p-2 rounded-lg shrink-0`}><Trophy size={20} className="text-white" /></div>
           <span className="font-bold text-sm md:text-base">{showNotification}</span>
           <button onClick={() => setShowNotification(null)} className="ml-auto md:ml-2 hover:opacity-70 p-1"><X size={16} /></button>
