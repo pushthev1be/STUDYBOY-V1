@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Flashcard } from '../types';
-import { ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, ChevronDown, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface FlashcardViewProps {
@@ -207,14 +207,50 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
         </button>
       </div>
 
-      <button
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
         onClick={loadMore}
         disabled={isLoadingMore}
-        className="mt-4 w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-indigo-100"
+        className={`mt-4 w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-indigo-100 ${isLoadingMore ? 'cursor-not-allowed' : ''}`}
       >
-        {isLoadingMore ? <ChevronDown size={20} className="animate-bounce" /> : <ChevronDown size={20} />}
-        {isLoadingMore ? 'Generating 15 more cards...' : 'Load More Flashcards'}
-      </button>
+        <AnimatePresence mode="wait">
+          {isLoadingMore ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0, rotate: -180 }}
+              animate={{ opacity: 1, rotate: 0 }}
+              exit={{ opacity: 0, rotate: 180 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Loader2 size={24} className="animate-spin" />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="icon"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown size={24} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <span className="relative">
+          {isLoadingMore ? 'Generating 15 more cards...' : 'Load More Flashcards'}
+          {isLoadingMore && (
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+              className="absolute -right-4"
+            >
+              .
+            </motion.span>
+          )}
+        </span>
+      </motion.button>
     </div>
   );
 };
