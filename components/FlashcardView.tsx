@@ -64,6 +64,18 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
     }
   };
 
+  const prevCardsLength = React.useRef(cards.length);
+
+  React.useEffect(() => {
+    // If the number of cards increased and we were just loading more,
+    // jump to the first of the new cards
+    if (cards.length > prevCardsLength.current && isLoadingMore) {
+      setCurrentIndex(prevCardsLength.current);
+      setIsFlipped(false);
+    }
+    prevCardsLength.current = cards.length;
+  }, [cards.length, isLoadingMore]);
+
   React.useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') nextCard();

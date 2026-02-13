@@ -150,6 +150,18 @@ const ADDITIONAL_QUESTIONS_SCHEMA = {
   }
 };
 
+const FLASHCARDS_LIST_SCHEMA = {
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      question: { type: Type.STRING },
+      answer: { type: Type.STRING }
+    },
+    required: ["question", "answer"]
+  }
+};
+
 // Default system instruction (PA focused)
 const DEFAULT_SYSTEM_INSTRUCTION = DOMAIN_INSTRUCTIONS['PA'];
 
@@ -160,32 +172,32 @@ async function retryWithBackoff<T>(
   initialDelayMs: number = 1000
 ): Promise<T> {
   let lastError: any;
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error: any) {
       lastError = error;
-      
+
       // Check if error is retryable (503, 429, or network errors)
-      const isRetryable = 
-        error?.status === 503 || 
-        error?.status === 429 || 
+      const isRetryable =
+        error?.status === 503 ||
+        error?.status === 429 ||
         error?.message?.includes('overloaded') ||
         error?.message?.includes('UNAVAILABLE');
-      
+
       if (!isRetryable || attempt === maxRetries - 1) {
         throw error;
       }
-      
+
       // Exponential backoff: 1s, 2s, 4s
       const delayMs = initialDelayMs * Math.pow(2, attempt);
       console.log(`Attempt ${attempt + 1} failed. Retrying in ${delayMs}ms...`);
-      
+
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
-  
+
   throw lastError;
 }
 
@@ -194,7 +206,7 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const model = 'gemini-3-flash-preview';
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
-  const prompt = isImage 
+  const prompt = isImage
     ? `Analyze this clinical image. Generate a structured study guide with:
 - Big Picture Question
 - Key Concepts & Definitions (term | definition)
@@ -219,7 +231,7 @@ Generate 15 quiz questions (each with a "subtopic" field like "Pathophysiology",
     return await retryWithBackoff(async () => {
       const response = await ai.models.generateContent({
         model,
-        contents: isImage 
+        contents: isImage
           ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
           : [{ parts: [{ text: prompt }] }],
         config: {
@@ -301,7 +313,10 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const model = 'gemini-3-flash-preview';
 
-  const prompt = `Generate 15 flashcard pairs about: "${topic}". Cover different aspects and difficulty levels. Be concise.`;
+  const prompt = `Generate EXACTLY 15 new, unique flashcard pairs about: "${topic}". 
+  Ensure they cover different aspects and vary in difficulty. 
+  DO NOT repeat common knowledge already covered in basic sets.
+  Focus on high-yield clinical facts and mechanisms.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -311,6 +326,7 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
         config: {
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
+          responseSchema: FLASHCARDS_LIST_SCHEMA,
           maxOutputTokens: 4000,
           thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
         },
