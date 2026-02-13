@@ -235,8 +235,7 @@ export async function processStudyContent(content: string, isImage: boolean = fa
           systemInstruction: systemInstruction,
           responseMimeType: "application/json",
           responseSchema: schema,
-          maxOutputTokens: 2000,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+          maxOutputTokens: 2000
         },
       });
       return JSON.parse(response.text || '{}');
@@ -294,8 +293,7 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-          maxOutputTokens: 4000,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+          maxOutputTokens: 4000
         },
       });
 
@@ -322,8 +320,7 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
-          maxOutputTokens: 2000,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+          maxOutputTokens: 2000
         },
       });
 
@@ -353,8 +350,7 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: FLASHCARDS_LIST_SCHEMA,
-          maxOutputTokens: 4000,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+          maxOutputTokens: 4000
         },
       });
 
