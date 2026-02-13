@@ -224,21 +224,26 @@ export async function processStudyContent(content: string, isImage: boolean = fa
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
   // Helper to generate a specific part of the material
-  const generatePart = async (prompt: string, schema: any): Promise<any> => {
+  const generatePart = async (prompt: string, schema: any, maxTokens: number = 2000): Promise<any> => {
     return retryWithBackoff(async () => {
-      const response = await ai.models.generateContent({
-        model,
-        contents: isImage
-          ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
-          : [{ parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: schema,
-          maxOutputTokens: 2000
-        },
-      });
-      return JSON.parse(response.text || '{}');
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: isImage
+            ? [{ parts: [{ inlineData: { data: content, mimeType: 'image/png' } }, { text: prompt }] }]
+            : [{ parts: [{ text: prompt }] }],
+          config: {
+            systemInstruction: systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema: schema,
+            maxOutputTokens: maxTokens
+          },
+        });
+        return JSON.parse(response.text || '{}');
+      } catch (parseError) {
+        console.error("JSON Parse Error in generatePart:", parseError);
+        return {}; // Return empty object as fallback for this specific part
+      }
     });
   };
 
@@ -249,20 +254,23 @@ export async function processStudyContent(content: string, isImage: boolean = fa
         `Generate a concise title and a pedagogical summary of the following content:
         
         ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
-        SUMMARY_SCHEMA
+        SUMMARY_SCHEMA,
+        2000
       ),
       generatePart(
         `Generate 15 high-yield, board-style quiz questions based on the following content. 
         Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology", "Diagnosis").
         
         ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
-        QUIZ_SCHEMA
+        QUIZ_SCHEMA,
+        8000
       ),
       generatePart(
         `Generate 15 high-yield clinical flashcard pairs based on the following content.
         
         ${isImage ? '[Analyze Clinical Image]' : 'NOTES:\n' + content}`,
-        FLASHCARDS_SCHEMA
+        FLASHCARDS_SCHEMA,
+        4000
       )
     ]);
 
@@ -297,7 +305,12 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
         },
       });
 
-      return JSON.parse(response.text || '[]') as QuizQuestion[];
+      try {
+        return JSON.parse(response.text || '[]') as QuizQuestion[];
+      } catch (e) {
+        console.error("Quiz Extension Parse Error:", e);
+        return [];
+      }
     });
   } catch (error) {
     console.error("Gemini Extension Error:", error);
@@ -324,7 +337,12 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
         },
       });
 
-      return JSON.parse(response.text || '[]') as QuizQuestion[];
+      try {
+        return JSON.parse(response.text || '[]') as QuizQuestion[];
+      } catch (e) {
+        console.error("Failure Question Parse Error:", e);
+        return [];
+      }
     });
   } catch (error) {
     console.error("Generate Question for Failure Error:", error);
@@ -350,12 +368,17 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: FLASHCARDS_LIST_SCHEMA,
-          maxOutputTokens: 4000
+          maxOutputTokens: 8000
         },
       });
 
-      const result = JSON.parse(response.text || '[]');
-      return Array.isArray(result) ? result : [];
+      try {
+        const result = JSON.parse(response.text || '[]');
+        return Array.isArray(result) ? result : [];
+      } catch (e) {
+        console.error("Flashcard Load More Parse Error:", e);
+        return [];
+      }
     });
   } catch (error) {
     console.error("Generate Additional Flashcards Error:", error);
