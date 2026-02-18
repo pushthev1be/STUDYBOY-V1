@@ -1,5 +1,6 @@
 
 # StudyGenius AI
+https://studyboy-v1.onrender.com
 
 Transform study notes and documents into interactive summaries, flashcards, and board-style quizzes with AI.
 
