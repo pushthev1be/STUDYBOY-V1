@@ -1,5 +1,6 @@
 
 # StudyGenius AI
+https://studyboy-v1.onrender.com
 [![Live Demo](https://img.shields.io/badge/Live-Demo-indigo)](https://studyboy-v1.onrender.com)
 
 Transform study notes and documents into interactive summaries, flashcards, and board-style quizzes with medical-grade AI synthesis. Optimized for PANCE, USMLE, and complex clinical board preparation.
