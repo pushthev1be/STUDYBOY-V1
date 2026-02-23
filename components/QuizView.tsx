@@ -23,12 +23,13 @@ interface QuizViewProps {
   questions: QuizQuestion[];
   onQuizComplete?: (score: number, total: number, questions: QuizQuestion[], questionStates: QuestionStatus[]) => void;
   onKeepGoing?: () => Promise<void>;
-  onQuestionFailed?: () => Promise<void>;
+  onQuestionFailed?: (concept: string) => Promise<void>;
   isExtending?: boolean;
   pastSessions?: QuizSession[];
   savedUploads?: SavedUpload[];
   onReattemptSession?: (session: QuizSession) => void;
   onOpenUpload?: (upload: SavedUpload) => void;
+  currentUploadId?: string | null;
 }
 
 export const QuizView: React.FC<QuizViewProps> = ({
@@ -41,6 +42,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   savedUploads = [],
   onReattemptSession,
   onOpenUpload,
+  currentUploadId,
 }) => {
   const safeQuestions = Array.isArray(questions) ? questions : [];
   const [sessionStates, setSessionStates] = useState<QuestionStatus[]>([]);
@@ -79,25 +81,34 @@ export const QuizView: React.FC<QuizViewProps> = ({
   };
 
   const handleDownloadUpload = (upload: SavedUpload | undefined, session: QuizSession) => {
-    if (!upload) return;
-    if (upload.sourceType === 'image' && upload.sourceDataUrl) {
-      const link = document.createElement('a');
-      link.href = upload.sourceDataUrl;
-      link.download = upload.fileName || `${session.topic}.png`;
-      link.click();
-      return;
-    }
-    if (upload.sourceText) {
-      const baseName = upload.fileName ? upload.fileName.replace(/\.[^/.]+$/, '') : session.topic;
-      const fileName = `${baseName}.txt`;
-      const blob = new Blob([upload.sourceText], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      URL.revokeObjectURL(url);
-    }
+    if (!upload || !upload.sources || upload.sources.length === 0) return;
+
+    // 1. Download each original source file
+    upload.sources.forEach((source, index) => {
+      if (source.sourceDataUrl) {
+        const link = document.createElement('a');
+        link.href = source.sourceDataUrl;
+        link.download = source.fileName || `${session.topic}_Source_${index + 1}`;
+        setTimeout(() => link.click(), index * 500);
+      }
+    });
+
+    // 2. Download the AI-generated Study Guide (Summary)
+    const baseName = upload.fileName ? upload.fileName.replace(/\.[^/.]+$/, '').replace(/ \(\+\d+ more\)/, '') : session.topic;
+    const fileName = `${baseName}_StudyGuide.txt`;
+
+    const downloadContent = `TITLE: ${upload.title}\n` +
+      `DATE: ${new Date(upload.createdAt).toLocaleString()}\n\n` +
+      `--- AI-GENERATED STUDY GUIDE ---\n\n` +
+      `${upload.material.summary}`;
+
+    const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    setTimeout(() => link.click(), upload.sources.length * 500);
+    setTimeout(() => URL.revokeObjectURL(url), (upload.sources.length + 2) * 1000);
   };
 
   const handleOptionSelect = (qIdx: number, optionIndex: number) => {
@@ -117,7 +128,58 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
     // Trigger auto-generate 2 more questions on failure
     if (!isCorrect && onQuestionFailed) {
-      onQuestionFailed();
+      const concept = safeQuestions[qIdx].subtopic || safeQuestions[qIdx].question;
+      onQuestionFailed(concept);
+    }
+  };
+
+  const handleLabelSelect = (qIdx: number, labelId: string, labelText: string) => {
+    if (isSubmitted) return;
+    const q = safeQuestions[qIdx];
+    const correctLabel = q.imageLabels?.find(l => l.id === labelId)?.label;
+    const isCorrect = correctLabel === labelText;
+
+    const newStates = [...sessionStates];
+    newStates[qIdx] = {
+      ...newStates[qIdx],
+      isAnswered: true,
+      isCorrect: isCorrect,
+      selectedOption: 0, // Mock for status tracker
+      showExplanation: true
+    };
+    setSessionStates(newStates);
+    if (!isCorrect && onQuestionFailed) {
+      const concept = safeQuestions[qIdx].subtopic || safeQuestions[qIdx].question;
+      onQuestionFailed(concept);
+    }
+  };
+
+  const [matchingSelections, setMatchingSelections] = useState<Record<number, Record<string, string>>>({});
+
+  const handleMatchingSelect = (qIdx: number, leftId: string, rightVal: string) => {
+    if (isSubmitted) return;
+    const newSelections = { ...matchingSelections };
+    if (!newSelections[qIdx]) newSelections[qIdx] = {};
+    newSelections[qIdx][leftId] = rightVal;
+    setMatchingSelections(newSelections);
+
+    const q = safeQuestions[qIdx];
+    const allAnswered = q.matchingPairs?.every(p => newSelections[qIdx][p.id]);
+
+    if (allAnswered) {
+      const allCorrect = q.matchingPairs?.every(p => newSelections[qIdx][p.id] === p.right);
+      const newStates = [...sessionStates];
+      newStates[qIdx] = {
+        ...newStates[qIdx],
+        isAnswered: true,
+        isCorrect: allCorrect || false,
+        showExplanation: true
+      };
+      setSessionStates(newStates);
+      if (!allCorrect && onQuestionFailed) {
+        const concept = safeQuestions[qIdx].subtopic || safeQuestions[qIdx].question;
+        onQuestionFailed(concept);
+      }
     }
   };
 
@@ -292,36 +354,121 @@ export const QuizView: React.FC<QuizViewProps> = ({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {q.options.map((option, oIdx) => {
-                      const isSelected = status.selectedOption === oIdx;
-                      const isCorrect = oIdx === q.correctAnswer;
-                      const showFeedback = status.isAnswered;
+                  <div className="space-y-6">
+                    {/* Render standard multiple-choice */}
+                    {(!q.type || q.type === 'multiple-choice') && q.options && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {q.options.map((option, oIdx) => {
+                          const isSelected = status.selectedOption === oIdx;
+                          const isCorrect = oIdx === q.correctAnswer;
+                          const showFeedback = status.isAnswered;
 
-                      let style = "border-slate-200 hover:border-indigo-200 hover:bg-slate-50";
-                      if (isSelected) style = "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-100";
-                      if (showFeedback) {
-                        if (isCorrect) style = "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100";
-                        else if (isSelected) style = "border-rose-500 bg-rose-50 ring-2 ring-rose-100";
-                        else style = "border-slate-100 opacity-50";
-                      }
+                          let style = "border-slate-200 hover:border-indigo-200 hover:bg-slate-50";
+                          if (isSelected) style = "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-100";
+                          if (showFeedback) {
+                            if (isCorrect) style = "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100";
+                            else if (isSelected) style = "border-rose-500 bg-rose-50 ring-2 ring-rose-100";
+                            else style = "border-slate-100 opacity-50";
+                          }
 
-                      return (
-                        <button
-                          key={oIdx}
-                          disabled={status.isAnswered}
-                          onClick={() => handleOptionSelect(qIdx, oIdx)}
-                          className={`p-4 md:p-5 rounded-xl md:rounded-2xl border-2 text-left transition-all flex items-center gap-3 md:gap-4 group ${style}`}
-                        >
-                          <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
-                            {isSelected && <Check size={12} className="text-white md:w-[14px] md:h-[14px]" />}
+                          return (
+                            <button
+                              key={oIdx}
+                              disabled={status.isAnswered}
+                              onClick={() => handleOptionSelect(qIdx, oIdx)}
+                              className={`p-4 md:p-5 rounded-xl md:rounded-2xl border-2 text-left transition-all flex items-center gap-3 md:gap-4 group ${style}`}
+                            >
+                              <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                                {isSelected && <Check size={12} className="text-white md:w-[14px] md:h-[14px]" />}
+                              </div>
+                              <span className={`text-sm md:text-base font-medium ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                {option}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Render Labeling Question */}
+                    {q.type === 'labeling' && q.imageLabels && (
+                      <div className="space-y-4">
+                        <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                          {(() => {
+                            const upload = savedUploads.find(u => u.id === currentUploadId);
+                            const imageSource = upload?.sources?.find(s => s.sourceType === 'image');
+                            if (imageSource?.sourceDataUrl) {
+                              return (
+                                <>
+                                  <img src={imageSource.sourceDataUrl} alt="Labeling diagram" className="w-full h-auto" />
+                                  {q.imageLabels.map(label => (
+                                    <button
+                                      key={label.id}
+                                      disabled={status.isAnswered}
+                                      onClick={() => {
+                                        const userInput = prompt(`What is this component?`);
+                                        if (userInput) handleLabelSelect(qIdx, label.id, userInput.trim());
+                                      }}
+                                      style={{ left: `${label.x}%`, top: `${label.y}%` }}
+                                      className={`absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-lg flex items-center justify-center transition-all ${status.isAnswered
+                                        ? 'bg-white border-slate-300 pointer-events-none'
+                                        : 'bg-indigo-600 border-white hover:scale-125'
+                                        }`}
+                                    >
+                                      <PlusCircle size={16} className="text-white" />
+                                    </button>
+                                  ))}
+                                </>
+                              );
+                            }
+                            return <div className="p-12 text-center text-slate-400 italic">Image reference missing for labeling</div>;
+                          })()}
+                        </div>
+                        {status.isAnswered && (
+                          <div className="flex flex-wrap gap-2">
+                            {q.imageLabels.map(l => (
+                              <span key={l.id} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold border border-indigo-100">
+                                {l.label}
+                              </span>
+                            ))}
                           </div>
-                          <span className={`text-sm md:text-base font-medium ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
-                            {option}
-                          </span>
-                        </button>
-                      );
-                    })}
+                        )}
+                      </div>
+                    )}
+
+                    {/* Render Matching Question */}
+                    {q.type === 'matching' && q.matchingPairs && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            {q.matchingPairs.map(pair => (
+                              <div key={pair.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700">
+                                {pair.left}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="space-y-3">
+                            {q.matchingPairs.map(pair => (
+                              <select
+                                key={pair.id}
+                                disabled={status.isAnswered}
+                                onChange={(e) => handleMatchingSelect(qIdx, pair.id, e.target.value)}
+                                className={`w-full p-4 rounded-xl border-2 text-sm font-medium focus:ring-2 focus:ring-indigo-100 transition-all ${status.isAnswered
+                                  ? (matchingSelections[qIdx]?.[pair.id] === pair.right ? 'border-emerald-500 bg-emerald-50' : 'border-rose-500 bg-rose-50')
+                                  : 'border-slate-200 bg-white'
+                                  }`}
+                                value={matchingSelections[qIdx]?.[pair.id] || ''}
+                              >
+                                <option value="">Select match...</option>
+                                {q.matchingPairs.map(p => (
+                                  <option key={p.id} value={p.right}>{p.right}</option>
+                                ))}
+                              </select>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {status.showExplanation && (
@@ -332,7 +479,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         </div>
                         <div>
                           <h4 className="font-bold text-slate-800 mb-1">
-                            {status.isCorrect ? 'Correct!' : `The correct answer is "${q.options[q.correctAnswer]}".`}
+                            {status.isCorrect ? 'Correct!' : (q.options ? `The correct answer is "${q.options[q.correctAnswer]}".` : 'Review the explanation below.')}
                           </h4>
                           <p className="text-slate-600 text-sm leading-relaxed">{q.explanation}</p>
                         </div>

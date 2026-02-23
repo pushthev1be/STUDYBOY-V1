@@ -43,8 +43,11 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
         continue;
       }
 
-      // Check if this is a section header (key indicator: ends with colon)
-      const isSectionHeader = line.endsWith(':') && !line.includes('|');
+      // Check if this is a section header (more flexible: check for keywords or ends with colon)
+      const headerKeywords = ['big picture', 'key concept', 'comparison table', 'test yourself', 'misconception', 'essential question'];
+      const startsWithKeyword = headerKeywords.some(kw => line.toLowerCase().startsWith(kw));
+      const hasColon = line.includes(':');
+      const isSectionHeader = (startsWithKeyword || line.endsWith(':')) && !line.includes('|');
 
       if (isSectionHeader) {
         // Save any table in progress

@@ -21,6 +21,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
     setLoading(true);
     setTimeout(() => {
       const user: User = {
+        id: crypto.randomUUID(),
         username: formData.username || formData.email.split('@')[0],
         email: formData.email,
         joinedAt: new Date().toISOString()
@@ -43,45 +44,45 @@ export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
 
         <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100">
           <h2 className="text-2xl font-bold text-slate-800 mb-8">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-          
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Full Name"
                   required
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900 font-medium"
                   value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 />
               </div>
             )}
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-              <input 
-                type="email" 
+              <input
+                type="email"
                 placeholder="Email Address"
                 required
                 className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900 font-medium"
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-              <input 
-                type="password" 
+              <input
+                type="password"
                 placeholder="Password"
                 required
                 className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900 font-medium"
                 value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
             </div>
 
-            <button 
+            <button
               disabled={loading}
               className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 disabled:opacity-50"
             >
@@ -96,7 +97,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
           </form>
 
           <div className="mt-8 pt-8 border-t border-slate-100 text-center">
-            <button 
+            <button
               onClick={() => setIsLogin(!isLogin)}
               className="text-slate-500 font-semibold hover:text-indigo-600 transition-colors"
             >

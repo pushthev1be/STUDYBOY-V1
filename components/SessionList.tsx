@@ -29,25 +29,35 @@ export const SessionList: React.FC<SessionListProps> = ({
     };
 
     const handleDownloadUpload = (upload: SavedUpload | undefined, session: QuizSession) => {
-        if (!upload) return;
-        if (upload.sourceType === 'image' && upload.sourceDataUrl) {
-            const link = document.createElement('a');
-            link.href = upload.sourceDataUrl;
-            link.download = upload.fileName || `${session.topic}.png`;
-            link.click();
-            return;
-        }
-        if (upload.sourceText) {
-            const baseName = upload.fileName ? upload.fileName.replace(/\.[^/.]+$/, '') : session.topic;
-            const fileName = `${baseName}.txt`;
-            const blob = new Blob([upload.sourceText], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            link.click();
-            URL.revokeObjectURL(url);
-        }
+        if (!upload || !upload.sources || upload.sources.length === 0) return;
+
+        // 1. Download each original source file
+        upload.sources.forEach((source, index) => {
+            if (source.sourceDataUrl) {
+                const link = document.createElement('a');
+                link.href = source.sourceDataUrl;
+                link.download = source.fileName || `${session.topic}_Source_${index + 1}`;
+                // Stagger downloads slightly to avoid browser blocking
+                setTimeout(() => link.click(), index * 500);
+            }
+        });
+
+        // 2. Download the AI-generated Study Guide (Summary)
+        const baseName = upload.fileName ? upload.fileName.replace(/\.[^/.]+$/, '').replace(/ \(\+\d+ more\)/, '') : session.topic;
+        const fileName = `${baseName}_StudyGuide.txt`;
+
+        const downloadContent = `TITLE: ${upload.title}\n` +
+            `DATE: ${new Date(upload.createdAt).toLocaleString()}\n\n` +
+            `--- AI-GENERATED STUDY GUIDE ---\n\n` +
+            `${upload.material.summary}`;
+
+        const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        setTimeout(() => link.click(), upload.sources.length * 500);
+        setTimeout(() => URL.revokeObjectURL(url), (upload.sources.length + 2) * 1000);
     };
 
     if (sessions.length === 0) {
@@ -103,7 +113,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                                         Open Upload
                                     </button>
                                 )}
-                                {upload && (upload.sourceText || upload.sourceDataUrl) && (
+                                {upload && upload.sources && upload.sources.length > 0 && (
                                     <button
                                         onClick={() => handleDownloadUpload(upload, session)}
                                         className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
@@ -167,7 +177,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                                                     </div>
                                                 </div>
                                                 <div className="grid grid-cols-1 gap-2">
-                                                    {q.options.map((option, oIdx) => {
+                                                    {(!q.type || q.type === 'multiple-choice') && q.options && q.options.map((option, oIdx) => {
                                                         const isSelected = selectedOption === oIdx;
                                                         const isOptionCorrect = oIdx === q.correctAnswer;
 
@@ -187,6 +197,28 @@ export const SessionList: React.FC<SessionListProps> = ({
                                                             </div>
                                                         );
                                                     })}
+
+                                                    {q.type === 'labeling' && q.imageLabels && (
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            {q.imageLabels.map(l => (
+                                                                <span key={l.id} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-black border border-indigo-100 uppercase tracking-tighter">
+                                                                    {l.label}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {q.type === 'matching' && q.matchingPairs && (
+                                                        <div className="space-y-2 mt-2">
+                                                            {q.matchingPairs.map(p => (
+                                                                <div key={p.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl text-[10px]">
+                                                                    <span className="font-bold text-slate-700">{p.left}</span>
+                                                                    <span className="text-indigo-500 font-medium">→</span>
+                                                                    <span className="text-slate-600">{p.right}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-500 flex items-start gap-2">
                                                     <div className={`mt-0.5 shrink-0 ${isCorrect ? 'text-emerald-500' : 'text-rose-500'}`}>

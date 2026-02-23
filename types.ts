@@ -1,5 +1,6 @@
 
 export interface User {
+  id: string;
   username: string;
   email: string;
   joinedAt: string;
@@ -13,12 +14,30 @@ export interface Flashcard {
   nextReview?: number; // Unix timestamp for next review
 }
 
+export type QuestionType = 'multiple-choice' | 'labeling' | 'matching';
+
+export interface ImageLabel {
+  id: string;
+  label: string;
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+}
+
+export interface MatchingPair {
+  id: string;
+  left: string;
+  right: string;
+}
+
 export interface QuizQuestion {
   question: string;
   options: string[];
   correctAnswer: number;
   explanation: string;
   subtopic?: string;
+  type?: QuestionType;
+  imageLabels?: ImageLabel[];
+  matchingPairs?: MatchingPair[];
 }
 
 export interface StudyMaterial {
@@ -100,15 +119,27 @@ export interface ProcessingState {
   fileName: string;
 }
 
-export interface SavedUpload {
-  id: string;
+export interface UploadSource {
   fileName: string;
-  title: string;
-  domain: StudyDomain;
-  createdAt: string;
-  material: StudyMaterial;
   sourceType: 'text' | 'pdf' | 'image';
   sourceText?: string;
   sourceDataUrl?: string;
   sourceMimeType?: string;
+}
+
+export interface SavedUpload {
+  id: string;
+  fileName: string; // Primary file or batch name
+  title: string;
+  domain: StudyDomain;
+  createdAt: string;
+  material: StudyMaterial;
+  sources: UploadSource[];
+}
+
+export interface ContentPart {
+  type: 'text' | 'image';
+  data: string;
+  fileName?: string;
+  mimeType?: string;
 }

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope, History, Home } from 'lucide-react';
-import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload } from './types';
+import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload, ContentPart } from './types';
 import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useWindowSize } from 'react-use';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import { supabase } from './services/supabaseClient';
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
@@ -88,8 +89,8 @@ const LOADING_STEPS = [
   "Ready for Board Review!"
 ];
 
-const MAX_CHAR_COUNT = 100000; // ~25,000 tokens, plenty for study notes
-const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+const MAX_CHAR_COUNT = 500000; // ~125,000 tokens
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -132,8 +133,17 @@ const App: React.FC = () => {
     const savedGoals = localStorage.getItem('sg_goals');
 
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setState(AppState.IDLE);
+      const parsed = JSON.parse(savedUser);
+      // Validate UUID format to clear stale IDs from previous sessions
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parsed.id);
+      if (isUuid) {
+        setUser(parsed);
+        setState(AppState.IDLE);
+        fetchUserData(parsed.id); // Fetch from Supabase on mount
+      } else {
+        console.log('Clearing stale user ID:', parsed.id);
+        localStorage.removeItem('sg_user');
+      }
     }
     if (savedStats) {
       const parsedStats = JSON.parse(savedStats);
@@ -173,14 +183,168 @@ const App: React.FC = () => {
     if (savedUploads) setSavedUploads(JSON.parse(savedUploads));
   }, []);
 
+  const fetchUserData = async (userId: string) => {
+    try {
+      // Fetch Profile (Stats, Achievements, Goals)
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      if (profile) {
+        if (profile.stats) setStats(profile.stats);
+        if (profile.achievements) setAchievements(profile.achievements);
+        if (profile.goals) setGoals(profile.goals);
+      }
+
+      // Fetch Sessions
+      const { data: sessions } = await supabase.from('study_sessions').select('data').eq('user_id', userId).order('created_at', { ascending: false });
+      if (sessions && sessions.length > 0) {
+        setQuizSessions(sessions.map(s => s.data));
+      }
+
+      // Fetch Uploads
+      const { data: uploads } = await supabase.from('uploads').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      if (uploads && uploads.length > 0) {
+        setSavedUploads(uploads.map(u => ({
+          id: u.id,
+          fileName: u.file_name,
+          title: u.title,
+          domain: u.domain,
+          createdAt: u.created_at,
+          material: u.material,
+          sources: Array.isArray(u.sources) ? u.sources : []
+        })));
+      }
+    } catch (err) {
+      console.warn('Error fetching Supabase data:', err);
+    }
+  };
+
   useEffect(() => {
-    if (user) localStorage.setItem('sg_user', JSON.stringify(user));
-    localStorage.setItem('sg_stats', JSON.stringify({ ...stats, lastActive: new Date().toISOString() }));
-    localStorage.setItem('sg_achievements', JSON.stringify(achievements));
-    localStorage.setItem('sg_goals', JSON.stringify(goals));
-    localStorage.setItem('sg_quiz_sessions', JSON.stringify(quizSessions));
-    localStorage.setItem('sg_uploads', JSON.stringify(savedUploads));
-  }, [user, stats, achievements, goals, quizSessions, savedUploads]);
+    if (user) {
+      localStorage.setItem('sg_user', JSON.stringify(user));
+      // Sync to Supabase
+      supabase.from('profiles').upsert({
+        id: (user as any).id, // Assuming user has an id or using email as key
+        username: user.username,
+        stats: stats,
+        achievements: achievements,
+        goals: goals,
+        updated_at: new Date().toISOString()
+      }).then(({ error }) => {
+        if (error && error.message !== 'Supabase URL not configured') {
+          console.warn('Supabase profile sync error:', error);
+        }
+      });
+    }
+
+    const safeLocalStorageSet = (key: string, value: string) => {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+          console.warn(`LocalStorage quota exceeded for ${key}. Data will persist in Supabase.`);
+        } else {
+          console.error(`LocalStorage error for ${key}:`, e);
+        }
+      }
+    };
+
+    safeLocalStorageSet('sg_stats', JSON.stringify({ ...stats, lastActive: new Date().toISOString() }));
+    safeLocalStorageSet('sg_achievements', JSON.stringify(achievements));
+    safeLocalStorageSet('sg_goals', JSON.stringify(goals));
+    safeLocalStorageSet('sg_quiz_sessions', JSON.stringify(quizSessions));
+
+    // For uploads, strip large binary/text data before saving to localStorage to avoid quota errors.
+    // Full data is safely stored in Supabase.
+    const lightUploads = savedUploads.map(u => ({
+      ...u,
+      sources: (u.sources || []).map(s => ({ ...s, sourceDataUrl: undefined, sourceText: undefined }))
+    }));
+    safeLocalStorageSet('sg_uploads', JSON.stringify(lightUploads));
+
+    // Async sync sessions to Supabase
+    const syncSessions = async () => {
+      if (!user || quizSessions.length === 0) return;
+      try {
+        const { error } = await supabase.from('study_sessions').upsert(
+          quizSessions.map(s => ({
+            id: s.id,
+            user_id: (user as any).id,
+            topic: s.topic,
+            score: s.score,
+            total: s.total,
+            data: s,
+            created_at: s.date
+          }))
+        );
+        if (error && error.message !== 'Supabase URL not configured') {
+          console.warn('Supabase session sync error:', error);
+        }
+      } catch (err) {
+        console.error('Session sync error:', err);
+      }
+    };
+
+    // Async sync profile to Supabase
+    const syncProfile = async () => {
+      if (!user) return;
+      try {
+        const { error } = await supabase.from('profiles').upsert({
+          id: (user as any).id,
+          username: (user as any).username,
+          stats,
+          achievements,
+          goals,
+          updated_at: new Date().toISOString()
+        });
+        if (error && error.message !== 'Supabase URL not configured') {
+          console.warn('Supabase profile sync error:', error);
+        }
+      } catch (err) {
+        console.error('Profile sync error:', err);
+      }
+    };
+
+    syncSessions();
+    syncProfile();
+  }, [user, stats, achievements, goals, quizSessions]);
+
+  // Dedicated helper to sync a single upload - call this only when needed
+  const syncUploadToSupabase = async (upload: SavedUpload) => {
+    if (!user) return;
+
+    const performSync = async (dataToSync: any) => {
+      return await supabase.from('uploads').upsert({
+        id: upload.id,
+        user_id: (user as any).id,
+        file_name: upload.fileName,
+        title: upload.title,
+        domain: upload.domain,
+        material: dataToSync.material,
+        sources: dataToSync.sources,
+        created_at: upload.createdAt
+      });
+    };
+
+    try {
+      const { error } = await performSync(upload);
+
+      if (error) {
+        // If timeout error (57014), try syncing a "light" version without the massive source images
+        if (error.code === '57014' || error.message?.toLowerCase().includes('timeout')) {
+          console.warn('Sync timeout. Attempting to sync light version (no images)...');
+          const lightSources = (upload.sources || []).map(s => ({
+            ...s,
+            sourceDataUrl: undefined // Remove large image data but keep text
+          }));
+          const { error: retryError } = await performSync({ ...upload, sources: lightSources });
+          if (retryError) console.error('Final sync attempt failed:', retryError);
+        } else {
+          console.error('Error syncing individual upload:', error);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync upload:', err);
+    }
+  };
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -280,11 +444,14 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-    if (file.size > MAX_FILE_SIZE) {
-      setErrorMessage("File is too large. Please upload a document smaller than 15MB.");
+    let totalSize = 0;
+    for (let i = 0; i < files.length; i++) totalSize += files[i].size;
+
+    if (totalSize > MAX_FILE_SIZE) {
+      setErrorMessage(`Total file size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds limit of 50MB.`);
       setState(AppState.ERROR);
       return;
     }
@@ -294,97 +461,87 @@ const App: React.FC = () => {
     setLoadingStep(0);
 
     try {
-      const isImage = file.type.startsWith('image/');
-      const isPDF = file.type === 'application/pdf';
+      const parts: any[] = [];
+      const sources: any[] = [];
+      let combinedText = '';
 
-      const isMarkdown = file.name.endsWith('.md') || file.type === 'text/markdown';
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const isImage = file.type.startsWith('image/');
+        const isPDF = file.type === 'application/pdf';
+        const isMarkdown = file.name.endsWith('.md') || file.type === 'text/markdown';
 
-      let content = '';
-      let sourceText: string | undefined;
-      let sourceDataUrl: string | undefined;
-      let sourceType: 'text' | 'pdf' | 'image' = 'text';
-
-      if (isImage) {
         const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result as string);
           reader.readAsDataURL(file);
         });
-        sourceDataUrl = dataUrl;
-        content = dataUrl.split(',')[1];
-        sourceType = 'image';
-      } else if (isPDF) {
-        content = await extractTextFromPDF(file);
-        sourceText = content;
-        sourceType = 'pdf';
 
-      } else if (isMarkdown) {
-        content = await file.text();
-        sourceText = content;
-        sourceType = 'text';
-      } else {
-        content = await file.text();
-        sourceText = content;
-        sourceType = 'text';
+        let content = '';
+        let type: 'text' | 'image' = 'text';
+
+        if (isImage) {
+          content = dataUrl.split(',')[1];
+          type = 'image';
+        } else if (isPDF) {
+          content = await extractTextFromPDF(file);
+          type = 'text';
+        } else {
+          content = await file.text();
+          type = 'text';
+        }
+
+        parts.push({
+          type,
+          data: content,
+          fileName: file.name,
+          mimeType: file.type
+        });
+
+        sources.push({
+          fileName: file.name,
+          sourceType: isImage ? 'image' : isPDF ? 'pdf' : 'text',
+          sourceText: type === 'text' ? content : undefined,
+          sourceDataUrl: dataUrl,
+          sourceMimeType: file.type
+        });
+
+        if (type === 'text') combinedText += content + '\n\n';
       }
 
-      if (!content || content.trim().length < 20) {
-        throw new Error("Could not extract enough text from the document. Please ensure it contains readable text.");
-      }
+      setProcessedChars(combinedText.length);
 
-      // Track content coverage: split when it exceeds limit
-      let unprocessedContent = '';
-      if (content.length > MAX_CHAR_COUNT) {
-        unprocessedContent = content.substring(MAX_CHAR_COUNT);
-        content = content.substring(0, MAX_CHAR_COUNT);
-      }
-
-      setProcessedChars(content.length);
-
-      // Store processing state for later use
-      setProcessingState({
-        totalContent: content + unprocessedContent,
-        processedContent: content,
-        unprocessedContent,
-        fileName: file.name
-      });
-
-      const result = await processStudyContent(content, isImage, selectedDomain);
-      const coveragePercent = unprocessedContent
-        ? Math.round((content.length / (content.length + unprocessedContent.length)) * 100)
-        : 100;
-
-      const nextMaterial: StudyMaterial = {
-        ...result,
-        unprocessedContent,
-        contentCoveragePercent: coveragePercent
-      };
+      const result = await processStudyContent(parts, selectedDomain);
 
       const uploadId = Date.now().toString();
+      const nextMaterial: StudyMaterial = {
+        ...result,
+        contentCoveragePercent: combinedText.length > MAX_CHAR_COUNT ? Math.round((MAX_CHAR_COUNT / combinedText.length) * 100) : 100
+      };
+
       setActiveUploadId(uploadId);
       setMaterial(nextMaterial);
       setQuizResetKey(Date.now().toString());
       setSavedUploads(prev => {
-        const filtered = prev.filter(upload => !(upload.fileName === file.name && upload.title === (result.title || file.name)));
+        const primaryFileName = files.length > 1 ? `${files[0].name} (+${files.length - 1} more)` : files[0].name;
         const newUpload: SavedUpload = {
           id: uploadId,
-          fileName: file.name,
-          title: result.title || file.name,
+          fileName: primaryFileName,
+          title: result.title || primaryFileName,
           domain: selectedDomain,
           createdAt: new Date().toISOString(),
           material: nextMaterial,
-          sourceType,
-          sourceText,
-          sourceDataUrl,
-          sourceMimeType: file.type || undefined
+          sources
         };
-        return [newUpload, ...filtered].slice(0, 20);
+        // Sync to Supabase IMMEDIATELY for this specific upload
+        syncUploadToSupabase(newUpload);
+        return [newUpload, ...prev].slice(0, 50);
       });
       setState(AppState.VIEWING);
-      updateProgress('upload');
+      updateProgress('upload', { domain: selectedDomain });
     } catch (error: any) {
       console.error(error);
-      setErrorMessage(error.message || "Failed to process the document. Try a different format.");
+      setErrorMessage(error.message || "Failed to process the documents.");
       setState(AppState.ERROR);
     }
   };
@@ -396,15 +553,27 @@ const App: React.FC = () => {
     if (material.unprocessedContent) {
       setIsExtending(true);
       try {
-        const newMaterial = await processStudyContent(material.unprocessedContent, false);
-        setMaterial({
+        const newMaterial = await processStudyContent([{ type: 'text', data: material.unprocessedContent }], selectedDomain);
+        const nextMaterial = {
           ...material,
           summary: material.summary + '\n\n[Continued from remaining content]\n' + newMaterial.summary,
           flashcards: [...material.flashcards, ...newMaterial.flashcards],
           quiz: [...material.quiz, ...newMaterial.quiz],
           unprocessedContent: '', // Marked as fully processed
           contentCoveragePercent: 100
-        });
+        };
+        setMaterial(nextMaterial);
+
+        // Update it in the uploads list and sync
+        setSavedUploads(prev => prev.map(u => {
+          if (u.id === activeUploadId) {
+            const updated = { ...u, material: nextMaterial };
+            syncUploadToSupabase(updated);
+            return updated;
+          }
+          return u;
+        }));
+
         setShowNotification('Generated content from remaining material!');
         setTimeout(() => setShowNotification(null), 5000);
       } catch (err) {
@@ -417,12 +586,31 @@ const App: React.FC = () => {
       // Fallback: generate more questions from existing material
       setIsExtending(true);
       try {
-        const newQuestions = await extendQuiz(material.title, material.quiz.length);
+        const sources = savedUploads.find(u => u.id === activeUploadId)?.sources || [];
+        const parts: ContentPart[] = sources.map(s => ({
+          type: s.sourceType === 'image' ? 'image' : 'text',
+          data: s.sourceType === 'image' ? (s.sourceDataUrl?.split(',')[1] || '') : (s.sourceText || ''),
+          fileName: s.fileName,
+          mimeType: s.sourceMimeType
+        }));
+
+        const newQuestions = await extendQuiz(parts, selectedDomain);
         if (newQuestions.length > 0) {
-          setMaterial({
+          const nextMaterial = {
             ...material,
             quiz: [...material.quiz, ...newQuestions]
-          });
+          };
+          setMaterial(nextMaterial);
+
+          setSavedUploads(prev => prev.map(u => {
+            if (u.id === activeUploadId) {
+              const updated = { ...u, material: nextMaterial };
+              syncUploadToSupabase(updated);
+              return updated;
+            }
+            return u;
+          }));
+
           setShowNotification('Generated more practice questions!');
           setTimeout(() => setShowNotification(null), 5000);
         }
@@ -434,17 +622,36 @@ const App: React.FC = () => {
     }
   };
 
-  const handleQuestionFailed = async () => {
+  const handleQuestionFailed = async (concept: string) => {
     if (!material || isExtending) return;
 
     setIsExtending(true);
     try {
-      const newQuestions = await generateQuestionForFailure(material.title);
+      const sources = savedUploads.find(u => u.id === activeUploadId)?.sources || [];
+      const parts: ContentPart[] = sources.map(s => ({
+        type: s.sourceType === 'image' ? 'image' : 'text',
+        data: s.sourceType === 'image' ? (s.sourceDataUrl?.split(',')[1] || '') : (s.sourceText || ''),
+        fileName: s.fileName,
+        mimeType: s.sourceMimeType
+      }));
+
+      const newQuestions = await generateQuestionForFailure(parts, concept, selectedDomain);
       if (newQuestions.length > 0) {
-        setMaterial({
+        const nextMaterial = {
           ...material,
           quiz: [...material.quiz, ...newQuestions]
-        });
+        };
+        setMaterial(nextMaterial);
+
+        setSavedUploads(prev => prev.map(u => {
+          if (u.id === activeUploadId) {
+            const updated = { ...u, material: nextMaterial };
+            syncUploadToSupabase(updated);
+            return updated;
+          }
+          return u;
+        }));
+
         setShowNotification('💡 Generated 2 more questions to reinforce this concept!');
         setTimeout(() => setShowNotification(null), 4000);
       }
@@ -510,7 +717,11 @@ const App: React.FC = () => {
 
 
   if (state === AppState.AUTH) {
-    return <AuthView onAuth={(u) => { setUser(u); setState(AppState.IDLE); }} />;
+    return <AuthView onAuth={(u) => {
+      setUser(u);
+      setState(AppState.IDLE);
+      fetchUserData(u.id); // Fetch data for the newly logged in user
+    }} />;
   }
 
   const renderContent = () => {
@@ -561,7 +772,7 @@ const App: React.FC = () => {
           setQuizSessions(prev => [session, ...prev].slice(0, 50));
         }}
         onKeepGoing={handleKeepGoing}
-        onQuestionFailed={handleQuestionFailed}
+        onQuestionFailed={(concept) => handleQuestionFailed(concept)}
         isExtending={isExtending}
         pastSessions={quizSessions}
         savedUploads={savedUploads}
@@ -584,6 +795,7 @@ const App: React.FC = () => {
           setQuizResetKey(Date.now().toString());
         }}
         key={quizResetKey}
+        currentUploadId={activeUploadId}
       />;
       default: return null;
     }
@@ -697,7 +909,7 @@ const App: React.FC = () => {
                   <p className="mb-2 text-2xl font-bold text-slate-700">Drop your notes here</p>
                   <p className="text-slate-400">PDF, Text, Markdown, or Images (Max 15MB)</p>
                 </div>
-                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md,image/*" />
+                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md,image/*" multiple />
               </label>
             </motion.div>
 
