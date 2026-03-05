@@ -1,41 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope, History, Home } from 'lucide-react';
-import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload, ContentPart } from './types';
+import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload } from './types';
 import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
+import { supabase } from './services/supabaseClient';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
 import { QuizView } from './components/QuizView';
 import { AchievementsView } from './components/AchievementsView';
 import { SessionList } from './components/SessionList';
 import { AuthView } from './components/AuthView';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useWindowSize } from 'react-use';
+import { ThemeProvider } from './components/ThemeContext';
+import { ThemeSwitcher } from './components/ThemeSwitcher';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import { supabase } from './services/supabaseClient';
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 const INITIAL_ACHIEVEMENTS: Achievement[] = [
-  // BRONZE
-  { id: 'first_upload', title: 'Quick Starter', description: 'Upload your first study document.', icon: 'Zap', rarity: 'bronze', unlocked: false, requirement: 1, currentValue: 0 },
-  { id: 'quiz_master', title: 'Quiz Master', description: 'Complete 5 practice quizzes.', icon: 'Star', rarity: 'bronze', unlocked: false, requirement: 5, currentValue: 0 },
-  { id: 'night_owl', title: 'Night Owl', description: 'Study after midnight. Living that vampire life.', icon: 'Moon', rarity: 'bronze', unlocked: false, requirement: 1, currentValue: 0 },
-  { id: 'domain_hopper', title: 'Polymath', description: 'Upload materials to 3 different study domains.', icon: 'Target', rarity: 'bronze', unlocked: false, requirement: 3, currentValue: 0 },
-
-  // SILVER
-  { id: 'perfectionist', title: 'Perfectionist', description: 'Get 100% on any practice quiz.', icon: 'Award', rarity: 'silver', unlocked: false, requirement: 1, currentValue: 0 },
-  { id: 'reviewer', title: 'Diligent Student', description: 'Review 50 flashcards across your notes.', icon: 'BookOpen', rarity: 'silver', unlocked: false, requirement: 50, currentValue: 0 },
-  { id: 'on_fire', title: 'On Fire', description: 'Maintain a 3-day study streak. Don\'t stop now!', icon: 'Flame', rarity: 'silver', unlocked: false, requirement: 3, currentValue: 0 },
-  { id: 'marathon_runner', title: 'Study Marathon', description: 'Study 5 times in a single day.', icon: 'Zap', rarity: 'silver', unlocked: false, requirement: 5, currentValue: 0 },
-
-  // GOLD
-  { id: 'power_user', title: 'Study Genius', description: 'Generate 10 different study materials.', icon: 'Cpu', rarity: 'gold', unlocked: false, requirement: 10, currentValue: 0 },
-  { id: 'legendary_streak', title: 'Living Legend', description: 'Maintain a 7-day study streak!', icon: 'Flame', rarity: 'gold', unlocked: false, requirement: 7, currentValue: 0 },
-  { id: 'encyclopedic', title: 'Big Brain Energy', description: 'Review 250 flashcards total.', icon: 'BookOpen', rarity: 'gold', unlocked: false, requirement: 250, currentValue: 0 },
-  { id: 'perfect_streak', title: 'Unstoppable', description: 'Get 3 perfect quizzes in a row.', icon: 'Award', rarity: 'gold', unlocked: false, requirement: 3, currentValue: 0 },
+  { id: 'first_upload', title: 'Quick Starter', description: 'Upload your first study document.', icon: 'Zap', unlocked: false, requirement: 1, currentValue: 0 },
+  { id: 'quiz_master', title: 'Quiz Master', description: 'Complete 5 practice quizzes.', icon: 'Star', unlocked: false, requirement: 5, currentValue: 0 },
+  { id: 'perfectionist', title: 'Perfectionist', description: 'Get 100% on any practice quiz.', icon: 'Award', unlocked: false, requirement: 1, currentValue: 0 },
+  { id: 'reviewer', title: 'Diligent Student', description: 'Review 50 flashcards across your notes.', icon: 'BookOpen', unlocked: false, requirement: 50, currentValue: 0 },
+  { id: 'power_user', title: 'Study Genius', description: 'Generate 10 different study materials.', icon: 'Cpu', unlocked: false, requirement: 10, currentValue: 0 },
+  { id: 'night_owl', title: 'Night Owl', description: 'Study after midnight.', icon: 'Moon', unlocked: false, requirement: 1, currentValue: 0 },
+  { id: 'on_fire', title: 'On Fire', description: 'Maintain a 3-day study streak.', icon: 'Flame', unlocked: false, requirement: 3, currentValue: 0 },
+  { id: 'goal_getter', title: 'Goal Getter', description: 'Complete 10 daily goals.', icon: 'Target', unlocked: false, requirement: 10, currentValue: 0 },
 ];
 
 const INITIAL_GOALS: StudyGoal[] = [
@@ -49,10 +40,7 @@ const INITIAL_STATS: UserStats = {
   totalFlashcardsViewed: 0,
   perfectQuizzes: 0,
   streakDays: 0,
-  lastActive: new Date().toISOString(),
-  usedDomains: [],
-  dailyStudyCount: 0,
-  currentPerfectStreak: 0
+  lastActive: new Date().toISOString()
 };
 
 // SM-2 Spaced Repetition Algorithm
@@ -89,8 +77,8 @@ const LOADING_STEPS = [
   "Ready for Board Review!"
 ];
 
-const MAX_CHAR_COUNT = 500000; // ~125,000 tokens
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_CHAR_COUNT = 100000; // ~25,000 tokens, plenty for study notes
+const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -108,13 +96,10 @@ const App: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
   const [goals, setGoals] = useState<StudyGoal[]>(INITIAL_GOALS);
   const [showNotification, setShowNotification] = useState<string | null>(null);
-  const [notificationRarity, setNotificationRarity] = useState<'bronze' | 'silver' | 'gold' | null>(null);
   const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
   const [savedUploads, setSavedUploads] = useState<SavedUpload[]>([]);
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
   const [quizResetKey, setQuizResetKey] = useState<string>('');
-  const { width } = useWindowSize();
-  const isMobile = width < 768;
 
   useEffect(() => {
     let interval: number;
@@ -127,47 +112,13 @@ const App: React.FC = () => {
   }, [state]);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('sg_user');
+    // Local storage only for non-synced data
     const savedStats = localStorage.getItem('sg_stats');
     const savedAchievements = localStorage.getItem('sg_achievements');
     const savedGoals = localStorage.getItem('sg_goals');
 
-    if (savedUser) {
-      const parsed = JSON.parse(savedUser);
-      // Validate UUID format to clear stale IDs from previous sessions
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parsed.id);
-      if (isUuid) {
-        setUser(parsed);
-        setState(AppState.IDLE);
-        fetchUserData(parsed.id); // Fetch from Supabase on mount
-      } else {
-        console.log('Clearing stale user ID:', parsed.id);
-        localStorage.removeItem('sg_user');
-      }
-    }
-    if (savedStats) {
-      const parsedStats = JSON.parse(savedStats);
-      setStats({
-        ...INITIAL_STATS,
-        ...parsedStats,
-        // Ensure arrays exist
-        usedDomains: Array.isArray(parsedStats.usedDomains) ? parsedStats.usedDomains : INITIAL_STATS.usedDomains,
-        lastActive: parsedStats.lastActive || INITIAL_STATS.lastActive
-      });
-    }
-
-    if (savedAchievements) {
-      const parsedAchievements = JSON.parse(savedAchievements) as Achievement[];
-      // Merge: keep unlock status for existing IDs, add new ones from INITIAL
-      setAchievements(INITIAL_ACHIEVEMENTS.map(initial => {
-        const saved = parsedAchievements.find(s => s.id === initial.id);
-        if (saved) {
-          return { ...initial, unlocked: saved.unlocked, currentValue: saved.currentValue || 0 };
-        }
-        return initial;
-      }));
-    }
-
+    if (savedStats) setStats(JSON.parse(savedStats));
+    if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
     if (savedGoals) {
       const g = JSON.parse(savedGoals);
       const lastActive = savedStats ? JSON.parse(savedStats).lastActive : null;
@@ -177,174 +128,72 @@ const App: React.FC = () => {
         setGoals(g);
       }
     }
-    const savedSessions = localStorage.getItem('sg_quiz_sessions');
-    if (savedSessions) setQuizSessions(JSON.parse(savedSessions));
-    const savedUploads = localStorage.getItem('sg_uploads');
-    if (savedUploads) setSavedUploads(JSON.parse(savedUploads));
+
+    // Supabase auth and data fetching
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        handleUserLogin(session.user);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        handleUserLogin(session.user);
+      } else {
+        setUser(null);
+        setState(AppState.AUTH);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserData = async (userId: string) => {
-    try {
-      // Fetch Profile (Stats, Achievements, Goals)
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-      if (profile) {
-        if (profile.stats) setStats(profile.stats);
-        if (profile.achievements) setAchievements(profile.achievements);
-        if (profile.goals) setGoals(profile.goals);
-      }
+  const handleUserLogin = async (authUser: any) => {
+    setUser({
+      id: authUser.id,
+      username: authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'Learner',
+      email: authUser.email || '',
+      joinedAt: authUser.created_at || new Date().toISOString()
+    });
+    setState(AppState.IDLE);
 
-      // Fetch Sessions
-      const { data: sessions } = await supabase.from('study_sessions').select('data').eq('user_id', userId).order('created_at', { ascending: false });
-      if (sessions && sessions.length > 0) {
-        setQuizSessions(sessions.map(s => s.data));
-      }
+    // Fetch uploads
+    const { data: uploadsData } = await supabase.from('uploads').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+    if (uploadsData) {
+      setSavedUploads(uploadsData.map(u => ({
+        id: u.id,
+        fileName: u.file_name || 'Document',
+        title: u.title,
+        domain: u.domain || 'PA',
+        createdAt: u.created_at,
+        material: u.material,
+        sourceType: 'text', // Fallback
+        sources: u.sources || []
+      })));
+    }
 
-      // Fetch Uploads
-      const { data: uploads } = await supabase.from('uploads').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-      if (uploads && uploads.length > 0) {
-        setSavedUploads(uploads.map(u => ({
-          id: u.id,
-          fileName: u.file_name,
-          title: u.title,
-          domain: u.domain,
-          createdAt: u.created_at,
-          material: u.material,
-          sources: Array.isArray(u.sources) ? u.sources : []
-        })));
-      }
-    } catch (err) {
-      console.warn('Error fetching Supabase data:', err);
+    // Fetch sessions
+    const { data: sessionsData } = await supabase.from('study_sessions').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+    if (sessionsData) {
+      setQuizSessions(sessionsData.map(s => ({
+        id: s.id,
+        topic: s.topic,
+        score: s.score,
+        total: s.total,
+        date: s.created_at,
+        questions: s.data?.questions || [],
+        questionStates: s.data?.questionStates || {},
+        uploadId: s.data?.uploadId || undefined
+      })));
     }
   };
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('sg_user', JSON.stringify(user));
-      // Sync to Supabase
-      supabase.from('profiles').upsert({
-        id: (user as any).id, // Assuming user has an id or using email as key
-        username: user.username,
-        stats: stats,
-        achievements: achievements,
-        goals: goals,
-        updated_at: new Date().toISOString()
-      }).then(({ error }) => {
-        if (error && error.message !== 'Supabase URL not configured') {
-          console.warn('Supabase profile sync error:', error);
-        }
-      });
-    }
-
-    const safeLocalStorageSet = (key: string, value: string) => {
-      try {
-        localStorage.setItem(key, value);
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-          console.warn(`LocalStorage quota exceeded for ${key}. Data will persist in Supabase.`);
-        } else {
-          console.error(`LocalStorage error for ${key}:`, e);
-        }
-      }
-    };
-
-    safeLocalStorageSet('sg_stats', JSON.stringify({ ...stats, lastActive: new Date().toISOString() }));
-    safeLocalStorageSet('sg_achievements', JSON.stringify(achievements));
-    safeLocalStorageSet('sg_goals', JSON.stringify(goals));
-    safeLocalStorageSet('sg_quiz_sessions', JSON.stringify(quizSessions));
-
-    // For uploads, strip large binary/text data before saving to localStorage to avoid quota errors.
-    // Full data is safely stored in Supabase.
-    const lightUploads = savedUploads.map(u => ({
-      ...u,
-      sources: (u.sources || []).map(s => ({ ...s, sourceDataUrl: undefined, sourceText: undefined }))
-    }));
-    safeLocalStorageSet('sg_uploads', JSON.stringify(lightUploads));
-
-    // Async sync sessions to Supabase
-    const syncSessions = async () => {
-      if (!user || quizSessions.length === 0) return;
-      try {
-        const { error } = await supabase.from('study_sessions').upsert(
-          quizSessions.map(s => ({
-            id: s.id,
-            user_id: (user as any).id,
-            topic: s.topic,
-            score: s.score,
-            total: s.total,
-            data: s,
-            created_at: s.date
-          }))
-        );
-        if (error && error.message !== 'Supabase URL not configured') {
-          console.warn('Supabase session sync error:', error);
-        }
-      } catch (err) {
-        console.error('Session sync error:', err);
-      }
-    };
-
-    // Async sync profile to Supabase
-    const syncProfile = async () => {
-      if (!user) return;
-      try {
-        const { error } = await supabase.from('profiles').upsert({
-          id: (user as any).id,
-          username: (user as any).username,
-          stats,
-          achievements,
-          goals,
-          updated_at: new Date().toISOString()
-        });
-        if (error && error.message !== 'Supabase URL not configured') {
-          console.warn('Supabase profile sync error:', error);
-        }
-      } catch (err) {
-        console.error('Profile sync error:', err);
-      }
-    };
-
-    syncSessions();
-    syncProfile();
-  }, [user, stats, achievements, goals, quizSessions]);
-
-  // Dedicated helper to sync a single upload - call this only when needed
-  const syncUploadToSupabase = async (upload: SavedUpload) => {
-    if (!user) return;
-
-    const performSync = async (dataToSync: any) => {
-      return await supabase.from('uploads').upsert({
-        id: upload.id,
-        user_id: (user as any).id,
-        file_name: upload.fileName,
-        title: upload.title,
-        domain: upload.domain,
-        material: dataToSync.material,
-        sources: dataToSync.sources,
-        created_at: upload.createdAt
-      });
-    };
-
-    try {
-      const { error } = await performSync(upload);
-
-      if (error) {
-        // If timeout error (57014), try syncing a "light" version without the massive source images
-        if (error.code === '57014' || error.message?.toLowerCase().includes('timeout')) {
-          console.warn('Sync timeout. Attempting to sync light version (no images)...');
-          const lightSources = (upload.sources || []).map(s => ({
-            ...s,
-            sourceDataUrl: undefined // Remove large image data but keep text
-          }));
-          const { error: retryError } = await performSync({ ...upload, sources: lightSources });
-          if (retryError) console.error('Final sync attempt failed:', retryError);
-        } else {
-          console.error('Error syncing individual upload:', error);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to sync upload:', err);
-    }
-  };
+    localStorage.setItem('sg_stats', JSON.stringify({ ...stats, lastActive: new Date().toISOString() }));
+    localStorage.setItem('sg_achievements', JSON.stringify(achievements));
+    localStorage.setItem('sg_goals', JSON.stringify(goals));
+    // We no longer sync sessions and uploads to localstorage on every change
+  }, [stats, achievements, goals]);
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -367,12 +216,8 @@ const App: React.FC = () => {
   const triggerAchievement = (id: string) => {
     setAchievements(prev => prev.map(a => {
       if (a.id === id && !a.unlocked) {
-        setNotificationRarity(a.rarity);
-        setShowNotification(`Unlocked ${a.rarity.toUpperCase()}: ${a.title}!`);
-        setTimeout(() => {
-          setShowNotification(null);
-          setNotificationRarity(null);
-        }, 5000);
+        setShowNotification(`New Achievement: ${a.title}!`);
+        setTimeout(() => setShowNotification(null), 5000);
         return { ...a, unlocked: true };
       }
       return a;
@@ -384,53 +229,31 @@ const App: React.FC = () => {
       const newStats = { ...prev };
       const now = new Date();
       const last = new Date(prev.lastActive);
-      const isNewDay = now.toDateString() !== last.toDateString();
-
-      if (isNewDay) {
+      if (now.toDateString() !== last.toDateString()) {
         const diffTime = Math.abs(now.getTime() - last.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         if (diffDays === 1) newStats.streakDays += 1;
         else if (diffDays > 1) newStats.streakDays = 1;
-        newStats.dailyStudyCount = 0; // Reset daily count
       }
 
-      newStats.dailyStudyCount = (newStats.dailyStudyCount || 0) + 1;
-
-      // Check simple achievements
       if (newStats.streakDays >= 3) triggerAchievement('on_fire');
-      if (newStats.streakDays >= 7) triggerAchievement('legendary_streak');
-
       const hours = now.getHours();
       if (hours >= 0 && hours < 5) triggerAchievement('night_owl');
-      if (newStats.dailyStudyCount >= 5) triggerAchievement('marathon_runner');
 
       if (type === 'upload') {
         newStats.totalUploads += 1;
-        const domain = payload?.domain as StudyDomain;
-        if (!Array.isArray(newStats.usedDomains)) newStats.usedDomains = [];
-        if (domain && !newStats.usedDomains.includes(domain)) {
-          newStats.usedDomains.push(domain);
-        }
         if (newStats.totalUploads >= 1) triggerAchievement('first_upload');
         if (newStats.totalUploads >= 10) triggerAchievement('power_user');
-        if (newStats.usedDomains.length >= 3) triggerAchievement('domain_hopper');
       }
       if (type === 'quiz') {
         newStats.totalQuizzesCompleted += 1;
-        if (payload?.perfect) {
-          newStats.perfectQuizzes += 1;
-          newStats.currentPerfectStreak = (newStats.currentPerfectStreak || 0) + 1;
-          triggerAchievement('perfectionist');
-          if (newStats.currentPerfectStreak >= 3) triggerAchievement('perfect_streak');
-        } else {
-          newStats.currentPerfectStreak = 0;
-        }
+        if (payload?.perfect) newStats.perfectQuizzes += 1;
         if (newStats.totalQuizzesCompleted >= 5) triggerAchievement('quiz_master');
+        if (payload?.perfect) triggerAchievement('perfectionist');
       }
       if (type === 'flashcard') {
         newStats.totalFlashcardsViewed += 1;
         if (newStats.totalFlashcardsViewed >= 50) triggerAchievement('reviewer');
-        if (newStats.totalFlashcardsViewed >= 250) triggerAchievement('encyclopedic');
       }
       return newStats;
     });
@@ -444,14 +267,11 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    let totalSize = 0;
-    for (let i = 0; i < files.length; i++) totalSize += files[i].size;
-
-    if (totalSize > MAX_FILE_SIZE) {
-      setErrorMessage(`Total file size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds limit of 50MB.`);
+    if (file.size > MAX_FILE_SIZE) {
+      setErrorMessage("File is too large. Please upload a document smaller than 15MB.");
       setState(AppState.ERROR);
       return;
     }
@@ -461,87 +281,121 @@ const App: React.FC = () => {
     setLoadingStep(0);
 
     try {
-      const parts: any[] = [];
-      const sources: any[] = [];
-      let combinedText = '';
+      const isImage = file.type.startsWith('image/');
+      const isPDF = file.type === 'application/pdf';
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const isImage = file.type.startsWith('image/');
-        const isPDF = file.type === 'application/pdf';
-        const isMarkdown = file.name.endsWith('.md') || file.type === 'text/markdown';
+      const isMarkdown = file.name.endsWith('.md') || file.type === 'text/markdown';
 
+      let content = '';
+      let sourceText: string | undefined;
+      let sourceDataUrl: string | undefined;
+      let sourceType: 'text' | 'pdf' | 'image' = 'text';
+
+      if (isImage) {
         const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result as string);
           reader.readAsDataURL(file);
         });
+        sourceDataUrl = dataUrl;
+        content = dataUrl.split(',')[1];
+        sourceType = 'image';
+      } else if (isPDF) {
+        content = await extractTextFromPDF(file);
+        sourceText = content;
+        sourceType = 'pdf';
 
-        let content = '';
-        let type: 'text' | 'image' = 'text';
-
-        if (isImage) {
-          content = dataUrl.split(',')[1];
-          type = 'image';
-        } else if (isPDF) {
-          content = await extractTextFromPDF(file);
-          type = 'text';
-        } else {
-          content = await file.text();
-          type = 'text';
-        }
-
-        parts.push({
-          type,
-          data: content,
-          fileName: file.name,
-          mimeType: file.type
-        });
-
-        sources.push({
-          fileName: file.name,
-          sourceType: isImage ? 'image' : isPDF ? 'pdf' : 'text',
-          sourceText: type === 'text' ? content : undefined,
-          sourceDataUrl: dataUrl,
-          sourceMimeType: file.type
-        });
-
-        if (type === 'text') combinedText += content + '\n\n';
+      } else if (isMarkdown) {
+        content = await file.text();
+        sourceText = content;
+        sourceType = 'text';
+      } else {
+        content = await file.text();
+        sourceText = content;
+        sourceType = 'text';
       }
 
-      setProcessedChars(combinedText.length);
+      if (!content || content.trim().length < 20) {
+        throw new Error("Could not extract enough text from the document. Please ensure it contains readable text.");
+      }
 
-      const result = await processStudyContent(parts, selectedDomain);
+      // Track content coverage: split when it exceeds limit
+      let unprocessedContent = '';
+      if (content.length > MAX_CHAR_COUNT) {
+        unprocessedContent = content.substring(MAX_CHAR_COUNT);
+        content = content.substring(0, MAX_CHAR_COUNT);
+      }
 
-      const uploadId = Date.now().toString();
+      setProcessedChars(content.length);
+
+      // Store processing state for later use
+      setProcessingState({
+        totalContent: content + unprocessedContent,
+        processedContent: content,
+        unprocessedContent,
+        fileName: file.name
+      });
+
+      const result = await processStudyContent(content, isImage, selectedDomain);
+      const coveragePercent = unprocessedContent
+        ? Math.round((content.length / (content.length + unprocessedContent.length)) * 100)
+        : 100;
+
       const nextMaterial: StudyMaterial = {
         ...result,
-        contentCoveragePercent: combinedText.length > MAX_CHAR_COUNT ? Math.round((MAX_CHAR_COUNT / combinedText.length) * 100) : 100
+        unprocessedContent,
+        contentCoveragePercent: coveragePercent
       };
 
+      const uploadId = Date.now().toString();
       setActiveUploadId(uploadId);
       setMaterial(nextMaterial);
       setQuizResetKey(Date.now().toString());
+
+      const newUpload: SavedUpload = {
+        id: uploadId,
+        fileName: file.name,
+        title: result.title || file.name,
+        domain: selectedDomain,
+        createdAt: new Date().toISOString(),
+        material: nextMaterial,
+        sourceType,
+        sourceText,
+        sourceDataUrl,
+        sourceMimeType: file.type || undefined
+      };
+
       setSavedUploads(prev => {
-        const primaryFileName = files.length > 1 ? `${files[0].name} (+${files.length - 1} more)` : files[0].name;
-        const newUpload: SavedUpload = {
-          id: uploadId,
-          fileName: primaryFileName,
-          title: result.title || primaryFileName,
-          domain: selectedDomain,
-          createdAt: new Date().toISOString(),
-          material: nextMaterial,
-          sources
-        };
-        // Sync to Supabase IMMEDIATELY for this specific upload
-        syncUploadToSupabase(newUpload);
-        return [newUpload, ...prev].slice(0, 50);
+        const filtered = prev.filter(upload => !(upload.fileName === file.name && upload.title === (result.title || file.name)));
+        return [newUpload, ...filtered].slice(0, 20);
       });
+
+      if (user?.id) {
+        supabase.from('uploads').insert({
+          id: uploadId,
+          user_id: user.id,
+          file_name: newUpload.fileName,
+          title: newUpload.title,
+          domain: newUpload.domain,
+          created_at: newUpload.createdAt,
+          material: newUpload.material,
+          sources: [{
+            fileName: file.name,
+            sourceDataUrl: newUpload.sourceDataUrl,
+            sourceText: newUpload.sourceText,
+            sourceMimeType: newUpload.sourceMimeType,
+            sourceType: newUpload.sourceType
+          }]
+        }).then(({ error }) => {
+          if (error) console.error('Failed to save upload to Supabase', error);
+        });
+      }
+
       setState(AppState.VIEWING);
-      updateProgress('upload', { domain: selectedDomain });
+      updateProgress('upload');
     } catch (error: any) {
       console.error(error);
-      setErrorMessage(error.message || "Failed to process the documents.");
+      setErrorMessage(error.message || "Failed to process the document. Try a different format.");
       setState(AppState.ERROR);
     }
   };
@@ -553,27 +407,15 @@ const App: React.FC = () => {
     if (material.unprocessedContent) {
       setIsExtending(true);
       try {
-        const newMaterial = await processStudyContent([{ type: 'text', data: material.unprocessedContent }], selectedDomain);
-        const nextMaterial = {
+        const newMaterial = await processStudyContent(material.unprocessedContent, false);
+        setMaterial({
           ...material,
           summary: material.summary + '\n\n[Continued from remaining content]\n' + newMaterial.summary,
           flashcards: [...material.flashcards, ...newMaterial.flashcards],
           quiz: [...material.quiz, ...newMaterial.quiz],
           unprocessedContent: '', // Marked as fully processed
           contentCoveragePercent: 100
-        };
-        setMaterial(nextMaterial);
-
-        // Update it in the uploads list and sync
-        setSavedUploads(prev => prev.map(u => {
-          if (u.id === activeUploadId) {
-            const updated = { ...u, material: nextMaterial };
-            syncUploadToSupabase(updated);
-            return updated;
-          }
-          return u;
-        }));
-
+        });
         setShowNotification('Generated content from remaining material!');
         setTimeout(() => setShowNotification(null), 5000);
       } catch (err) {
@@ -586,31 +428,12 @@ const App: React.FC = () => {
       // Fallback: generate more questions from existing material
       setIsExtending(true);
       try {
-        const sources = savedUploads.find(u => u.id === activeUploadId)?.sources || [];
-        const parts: ContentPart[] = sources.map(s => ({
-          type: s.sourceType === 'image' ? 'image' : 'text',
-          data: s.sourceType === 'image' ? (s.sourceDataUrl?.split(',')[1] || '') : (s.sourceText || ''),
-          fileName: s.fileName,
-          mimeType: s.sourceMimeType
-        }));
-
-        const newQuestions = await extendQuiz(parts, selectedDomain);
+        const newQuestions = await extendQuiz(material.title, material.quiz.length);
         if (newQuestions.length > 0) {
-          const nextMaterial = {
+          setMaterial({
             ...material,
             quiz: [...material.quiz, ...newQuestions]
-          };
-          setMaterial(nextMaterial);
-
-          setSavedUploads(prev => prev.map(u => {
-            if (u.id === activeUploadId) {
-              const updated = { ...u, material: nextMaterial };
-              syncUploadToSupabase(updated);
-              return updated;
-            }
-            return u;
-          }));
-
+          });
           setShowNotification('Generated more practice questions!');
           setTimeout(() => setShowNotification(null), 5000);
         }
@@ -622,36 +445,17 @@ const App: React.FC = () => {
     }
   };
 
-  const handleQuestionFailed = async (concept: string) => {
+  const handleQuestionFailed = async () => {
     if (!material || isExtending) return;
 
     setIsExtending(true);
     try {
-      const sources = savedUploads.find(u => u.id === activeUploadId)?.sources || [];
-      const parts: ContentPart[] = sources.map(s => ({
-        type: s.sourceType === 'image' ? 'image' : 'text',
-        data: s.sourceType === 'image' ? (s.sourceDataUrl?.split(',')[1] || '') : (s.sourceText || ''),
-        fileName: s.fileName,
-        mimeType: s.sourceMimeType
-      }));
-
-      const newQuestions = await generateQuestionForFailure(parts, concept, selectedDomain);
+      const newQuestions = await generateQuestionForFailure(material.title);
       if (newQuestions.length > 0) {
-        const nextMaterial = {
+        setMaterial({
           ...material,
           quiz: [...material.quiz, ...newQuestions]
-        };
-        setMaterial(nextMaterial);
-
-        setSavedUploads(prev => prev.map(u => {
-          if (u.id === activeUploadId) {
-            const updated = { ...u, material: nextMaterial };
-            syncUploadToSupabase(updated);
-            return updated;
-          }
-          return u;
-        }));
-
+        });
         setShowNotification('💡 Generated 2 more questions to reinforce this concept!');
         setTimeout(() => setShowNotification(null), 4000);
       }
@@ -662,8 +466,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    setLoadingStep(0);
+    setState(AppState.PROCESSING); // Show loading temporarily
+    await supabase.auth.signOut();
     localStorage.removeItem('sg_user');
+    setSavedUploads([]);
+    setQuizSessions([]);
     setUser(null);
     setState(AppState.AUTH);
   };
@@ -717,338 +526,339 @@ const App: React.FC = () => {
 
 
   if (state === AppState.AUTH) {
-    return <AuthView onAuth={(u) => {
-      setUser(u);
-      setState(AppState.IDLE);
-      fetchUserData(u.id); // Fetch data for the newly logged in user
-    }} />;
+    return <AuthView onAuth={(u) => { setUser(u); setState(AppState.IDLE); }} />;
   }
 
   const renderContent = () => {
-    if (viewMode === 'stats') return <AchievementsView achievements={achievements} goals={goals} stats={stats} />;
-    if (!material) return null;
+    return (
+      <div className="w-full relative min-h-[50vh]">
+        <div className={viewMode === 'stats' ? 'block' : 'hidden'}>
+          <AchievementsView achievements={achievements} goals={goals} stats={stats} />
+        </div>
 
-    switch (viewMode) {
-      case 'summary': return <SummaryView summary={material.summary} title={material.title} contentCoveragePercent={material.contentCoveragePercent} hasUnprocessedContent={!!material.unprocessedContent} />;
-      case 'flashcards': return <FlashcardView
-        cards={material.flashcards}
-        topic={material.title}
-        onCardViewed={() => updateProgress('flashcard')}
-        onCardRated={(cardIndex, quality) => {
-          const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
-          setMaterial({
-            ...material,
-            flashcards: material.flashcards.map((card, idx) =>
-              idx === cardIndex
-                ? { ...card, ...updated }
-                : card
-            )
-          });
-        }}
-        onLoadMore={(newCards) => {
-          setMaterial({
-            ...material,
-            flashcards: [...material.flashcards, ...newCards]
-          });
-        }}
-      />;
-      case 'quiz': return <QuizView
-        questions={Array.isArray(material.quiz) ? material.quiz : []}
-        onQuizComplete={(score, total, questions, questionStates) => {
-          updateProgress('quiz', { perfect: score === total });
-          const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-            ? crypto.randomUUID()
-            : Date.now().toString();
-          const session: QuizSession = {
-            id: sessionId,
-            topic: material.title,
-            score,
-            total,
-            date: new Date().toISOString(),
-            questions: [...questions],
-            questionStates,
-            uploadId: activeUploadId || undefined
-          };
-          setQuizSessions(prev => [session, ...prev].slice(0, 50));
-        }}
-        onKeepGoing={handleKeepGoing}
-        onQuestionFailed={(concept) => handleQuestionFailed(concept)}
-        isExtending={isExtending}
-        pastSessions={quizSessions}
-        savedUploads={savedUploads}
-        onOpenUpload={handleOpenUpload}
-        onReattemptSession={(session) => {
-          const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
-          if ((!session.questions || session.questions.length === 0) && !upload) return;
-          if (upload) {
-            handleOpenUpload(upload);
-          } else if (material) {
-            setMaterial({
-              ...material,
-              title: session.topic,
-              quiz: session.questions
-            });
-            setState(AppState.VIEWING);
-          }
-          setViewMode('quiz');
-          setActiveUploadId(session.uploadId || null);
-          setQuizResetKey(Date.now().toString());
-        }}
-        key={quizResetKey}
-        currentUploadId={activeUploadId}
-      />;
-      default: return null;
-    }
+        {material && (
+          <>
+            <div className={viewMode === 'summary' ? 'block' : 'hidden'}>
+              <SummaryView
+                summary={material.summary}
+                title={material.title}
+                contentCoveragePercent={material.contentCoveragePercent}
+                hasUnprocessedContent={!!material.unprocessedContent}
+              />
+            </div>
+
+            <div className={viewMode === 'flashcards' ? 'block' : 'hidden'}>
+              <FlashcardView
+                cards={material.flashcards}
+                topic={material.title}
+                onCardViewed={() => updateProgress('flashcard')}
+                onCardRated={(cardIndex, quality) => {
+                  const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
+                  setMaterial({
+                    ...material,
+                    flashcards: material.flashcards.map((card, idx) =>
+                      idx === cardIndex
+                        ? { ...card, ...updated }
+                        : card
+                    )
+                  });
+                }}
+                onLoadMore={(newCards) => {
+                  setMaterial({
+                    ...material,
+                    flashcards: [...material.flashcards, ...newCards]
+                  });
+                }}
+              />
+            </div>
+
+            <div className={viewMode === 'quiz' ? 'block' : 'hidden'}>
+              <QuizView
+                key={quizResetKey}
+                questions={Array.isArray(material.quiz) ? material.quiz : []}
+                onQuizComplete={(score, total, questions, questionStates) => {
+                  updateProgress('quiz', { perfect: score === total });
+                  const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                    ? crypto.randomUUID()
+                    : Date.now().toString();
+                  const session: QuizSession = {
+                    id: sessionId,
+                    topic: material.title,
+                    score,
+                    total,
+                    date: new Date().toISOString(),
+                    questions: [...questions],
+                    questionStates,
+                    uploadId: activeUploadId || undefined
+                  };
+                  setQuizSessions(prev => [session, ...prev].slice(0, 50));
+
+                  if (user?.id) {
+                    supabase.from('study_sessions').insert({
+                      id: session.id,
+                      user_id: user.id,
+                      topic: session.topic,
+                      score: session.score,
+                      total: session.total,
+                      data: {
+                        questions: session.questions,
+                        questionStates: session.questionStates,
+                        uploadId: session.uploadId
+                      },
+                      created_at: session.date
+                    }).then(({ error }) => {
+                      if (error) console.error('Failed to save session to Supabase', error);
+                    });
+                  }
+                }}
+                onKeepGoing={handleKeepGoing}
+                onQuestionFailed={handleQuestionFailed}
+                isExtending={isExtending}
+                pastSessions={quizSessions}
+                savedUploads={savedUploads}
+                onOpenUpload={handleOpenUpload}
+                onReattemptSession={(session) => {
+                  const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
+                  if ((!session.questions || session.questions.length === 0) && !upload) return;
+                  if (upload) {
+                    handleOpenUpload(upload);
+                  } else if (material) {
+                    setMaterial({
+                      ...material,
+                      title: session.topic,
+                      quiz: session.questions
+                    });
+                    setState(AppState.VIEWING);
+                  }
+                  setViewMode('quiz');
+                  setActiveUploadId(session.uploadId || null);
+                  setQuizResetKey(Date.now().toString());
+                }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-slate-900 flex flex-col">
-      {showNotification && (
-        <div className={`fixed top-24 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md z-[100] ${notificationRarity === 'gold' ? 'bg-amber-500 text-white' :
-          notificationRarity === 'silver' ? 'bg-slate-400 text-white' :
-            notificationRarity === 'bronze' ? 'bg-orange-700 text-white' :
-              'bg-slate-900 text-white'
-          } px-4 md:px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 md:gap-4 animate-slide-down border border-white/20`}>
-          <div className={`${notificationRarity === 'gold' ? 'bg-amber-400' :
-            notificationRarity === 'silver' ? 'bg-slate-300' :
-              notificationRarity === 'bronze' ? 'bg-orange-600' :
-                'bg-indigo-500'
-            } p-2 rounded-lg shrink-0`}><Trophy size={20} className="text-white" /></div>
-          <span className="font-bold text-sm md:text-base">{showNotification}</span>
-          <button onClick={() => setShowNotification(null)} className="ml-auto md:ml-2 hover:opacity-70 p-1"><X size={16} /></button>
-        </div>
-      )}
-
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-2 md:px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-1.5 md:gap-3">
-          <div className="flex items-center gap-1.5 md:gap-3 cursor-pointer shrink-0" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
-            <div className="bg-indigo-600 p-1.5 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-indigo-100 flex-shrink-0"><BrainCircuit className="text-white w-5 h-5 md:w-7 md:h-7" /></div>
-            <div className="hidden md:block">
-              <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-slate-800">StudyGenius<span className="text-indigo-600">AI</span></h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
-            </div>
+    <ThemeProvider>
+      <div className="min-h-screen bg-theme-primary text-theme-primary flex flex-col">
+        {showNotification && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-theme-card text-theme-primary px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-slide-down border border-theme-primary">
+            <div className="bg-amber-500 p-2 rounded-lg"><Trophy size={20} className="text-white" /></div>
+            <span className="font-bold">{showNotification}</span>
+            <button onClick={() => setShowNotification(null)} className="ml-2 hover:text-theme-tertiary"><X size={16} /></button>
           </div>
+        )}
 
-          <div className="flex items-center gap-1.5 md:gap-4 overflow-hidden">
-            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-tighter">
-              <Zap size={14} fill="currentColor" /> Flash Engine Active
-            </div>
-            {state !== AppState.IDLE && (
-              <button
-                onClick={() => setState(AppState.IDLE)}
-                className="p-2 md:p-2.5 rounded-xl md:rounded-2xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm shrink-0"
-                title="Back to Dashboard"
-              >
-                <Home size={18} className="md:w-5 md:h-5" />
-              </button>
-            )}
-            {state === AppState.VIEWING && (
-              <div className="flex bg-slate-100 p-0.5 md:p-1 rounded-xl md:rounded-2xl gap-0.5 md:gap-1 overflow-hidden">
-                {[
-                  { id: 'summary', label: 'Summary', icon: FileText },
-                  { id: 'flashcards', label: 'Flashcards', icon: Layout },
-                  { id: 'quiz', label: 'Quiz', icon: Sparkles },
-                ].map((mode) => (
-                  <button
-                    key={mode.id}
-                    onClick={() => setViewMode(mode.id as ViewMode)}
-                    className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-5 py-1.5 md:py-2.5 rounded-lg md:rounded-xl font-semibold text-xs transition-all shrink-0 ${viewMode === mode.id ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
-                      }`}
-                  >
-                    <mode.icon size={14} className="md:w-[18px] md:h-[18px]" />
-                    <span className="hidden sm:inline">{mode.label}</span>
-                  </button>
-                ))}
+        <header className="bg-theme-secondary border-b border-theme-primary sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
+              <div className="bg-theme-accent p-2.5 rounded-2xl shadow-lg shadow-theme-accent"><BrainCircuit className="text-white" size={28} /></div>
+              <div>
+                <h1 className="text-2xl font-extrabold tracking-tight text-theme-primary">StudyGenius<span className="text-theme-accent">AI</span></h1>
+                <p className="text-[10px] text-theme-muted font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
               </div>
-            )}
-            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2 md:p-2.5 rounded-xl md:rounded-2xl transition-all shrink-0 ${viewMode === 'stats' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`} title="View Progress & Goals"><Trophy size={20} className="md:w-6 md:h-6" /></button>
-            <button onClick={handleLogout} className="p-2.5 rounded-2xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut size={24} /></button>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24">
-        {state === AppState.IDLE && (
-          <motion.div
-            layout
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="max-w-3xl mx-auto text-center animate-fade-in"
-          >
-            <div className="mb-8 md:mb-12">
-              <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 mb-4 md:mb-6 leading-tight">Crush your rotations, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">{user?.username}</span></h2>
-              <p className="text-base md:text-xl text-slate-500 max-w-xl mx-auto leading-relaxed">Upload study materials and generate smart study content tailored to your field.</p>
             </div>
 
-            {/* Domain Selector */}
-            <motion.div layout className="mb-8 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-              <label className="block text-sm font-bold text-slate-700 mb-4">What are you studying for?</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {(['PA', 'Nursing', 'Medical', 'GenEd'] as const).map((domain) => (
-                  <button
-                    key={domain}
-                    onClick={() => setSelectedDomain(domain)}
-                    className={`py-3 px-4 rounded-xl font-bold transition-all ${selectedDomain === domain
-                      ? 'bg-indigo-600 text-white shadow-lg'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                  >
-                    {domain === 'PA' && 'PA (PANCE)'}
-                    {domain === 'Nursing' && 'Nursing (NCLEX)'}
-                    {domain === 'Medical' && 'Medical (USMLE)'}
-                    {domain === 'GenEd' && 'General'}
-                  </button>
-                ))}
+            <div className="flex items-center gap-4">
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-theme-accent-bg text-theme-accent rounded-full text-[10px] font-black uppercase tracking-tighter">
+                <Zap size={14} fill="currentColor" /> Flash Engine Active
               </div>
-            </motion.div>
-
-            <motion.div layout className="relative group">
-              <label className="flex flex-col items-center justify-center w-full h-64 md:h-80 border-2 border-dashed border-slate-300 rounded-[2rem] md:rounded-[3rem] bg-white hover:bg-slate-50 hover:border-indigo-400 transition-all cursor-pointer shadow-sm">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <div className="bg-slate-100 p-6 rounded-full mb-6 group-hover:scale-110 group-hover:bg-indigo-50 transition-all duration-300"><Upload className="text-slate-400 group-hover:text-indigo-500" size={48} /></div>
-                  <p className="mb-2 text-2xl font-bold text-slate-700">Drop your notes here</p>
-                  <p className="text-slate-400">PDF, Text, Markdown, or Images (Max 15MB)</p>
-                </div>
-                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md,image/*" multiple />
-              </label>
-            </motion.div>
-
-            <AnimatePresence>
-              {savedUploads.length > 0 && (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-10 bg-white rounded-2xl border border-slate-200 p-6 text-left shadow-sm overflow-hidden"
+              {state !== AppState.IDLE && (
+                <button
+                  onClick={() => setState(AppState.IDLE)}
+                  className="p-2.5 rounded-2xl bg-theme-secondary text-theme-muted border border-theme-primary hover:bg-theme-hover hover:text-theme-accent transition-all shadow-sm"
+                  title="Back to Dashboard"
                 >
-                  <div className="flex items-center gap-2 mb-4">
-                    <History size={18} className="text-indigo-500" />
-                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Previous Uploads</h3>
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{savedUploads.length}</span>
+                  <Home size={20} />
+                </button>
+              )}
+              {state === AppState.VIEWING && (
+                <div className="hidden md:flex bg-theme-hover p-1.5 rounded-2xl gap-1">
+                  {[
+                    { id: 'summary', label: 'Summary', icon: FileText },
+                    { id: 'flashcards', label: 'Flashcards', icon: Layout },
+                    { id: 'quiz', label: 'Quiz', icon: Sparkles },
+                    { id: 'stats', label: 'Progress', icon: Trophy }
+                  ].map((mode) => (
+                    <button
+                      key={mode.id}
+                      onClick={() => setViewMode(mode.id as ViewMode)}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${viewMode === mode.id ? 'bg-theme-secondary text-theme-accent shadow-sm ring-1 ring-theme-primary' : 'text-theme-muted hover:text-theme-primary hover:bg-theme-secondary/50'
+                        }`}
+                    >
+                      <mode.icon size={18} /> {mode.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2.5 rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-theme-accent/20 text-theme-accent' : 'bg-theme-hover text-theme-muted hover:bg-theme-secondary'}`} title="View Progress & Goals"><Trophy size={24} /></button>
+              <ThemeSwitcher />
+              <button onClick={handleLogout} className="p-2.5 rounded-2xl bg-theme-hover text-theme-muted hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut size={24} /></button>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24">
+          {state === AppState.IDLE && (
+            <div className="max-w-3xl mx-auto text-center animate-fade-in">
+              <div className="mb-12">
+                <h2 className="text-5xl font-extrabold text-theme-primary mb-6 leading-tight">Crush your rotations, <span className="text-transparent bg-clip-text bg-gradient-to-r from-theme-accent to-violet-600">{user?.username}</span></h2>
+                <p className="text-xl text-theme-muted max-w-xl mx-auto leading-relaxed">Upload study materials and generate smart study content tailored to your field.</p>
+              </div>
+
+              {/* Domain Selector */}
+              <div className="mb-8 bg-theme-card rounded-2xl border border-theme-primary p-6 shadow-sm">
+                <label className="block text-sm font-bold text-theme-secondary mb-4">What are you studying for?</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {(['PA', 'Nursing', 'Medical', 'GenEd'] as const).map((domain) => (
+                    <button
+                      key={domain}
+                      onClick={() => setSelectedDomain(domain)}
+                      className={`py-3 px-4 rounded-xl font-bold transition-all ${selectedDomain === domain
+                        ? 'bg-theme-accent text-white shadow-lg'
+                        : 'bg-theme-hover text-theme-secondary hover:bg-theme-secondary/20'
+                        }`}
+                    >
+                      {domain === 'PA' && 'PA (PANCE)'}
+                      {domain === 'Nursing' && 'Nursing (NCLEX)'}
+                      {domain === 'Medical' && 'Medical (USMLE)'}
+                      {domain === 'GenEd' && 'General'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative group">
+                <label className="flex flex-col items-center justify-center w-full h-80 border-2 border-dashed border-theme-primary rounded-[3rem] bg-theme-card hover:bg-theme-hover hover:border-theme-accent transition-all cursor-pointer shadow-sm">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <div className="bg-theme-hover p-6 rounded-full mb-6 group-hover:scale-110 group-hover:bg-theme-accent/20 transition-all duration-300"><Upload className="text-theme-muted group-hover:text-theme-accent" size={48} /></div>
+                    <p className="mb-2 text-2xl font-bold text-theme-primary">Drop your notes here</p>
+                    <p className="text-theme-muted">PDF, Text, or Markdown (Max 15MB)</p>
                   </div>
-                  <div className="divide-y divide-slate-100">
+                  <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md" />
+                </label>
+              </div>
+
+              {savedUploads.length > 0 && (
+                <div className="mt-10 bg-theme-card rounded-2xl border border-theme-primary p-6 text-left shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <History size={18} className="text-theme-accent" />
+                    <h3 className="text-sm font-bold text-theme-secondary uppercase tracking-widest">Previous Uploads</h3>
+                    <span className="text-[10px] font-bold text-theme-muted bg-theme-hover px-2 py-0.5 rounded-full">{savedUploads.length}</span>
+                  </div>
+                  <div className="divide-y divide-theme-primary">
                     {savedUploads.slice(0, 6).map((upload) => (
-                      <motion.div layout key={upload.id} className="py-3 flex items-center justify-between gap-4 text-xs sm:text-sm">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-800 truncate">{upload.title}</p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {upload.fileName} • {upload.domain}
+                      <div key={upload.id} className="py-3 flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-semibold text-theme-primary text-sm">{upload.title}</p>
+                          <p className="text-xs text-theme-muted">
+                            {upload.fileName} • {upload.domain} • {new Date(upload.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
                         <button
                           onClick={() => handleOpenUpload(upload)}
-                          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all whitespace-nowrap"
+                          className="px-4 py-2 bg-theme-accent text-white rounded-xl text-xs font-bold hover:brightness-110 transition-all"
                         >
                           Open
                         </button>
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
 
-            {quizSessions.length > 0 && (
-              <motion.div layout className="mt-10 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm text-left">
-                <div className="p-6 border-b border-slate-100 flex items-center gap-2">
-                  <History size={18} className="text-indigo-500" />
-                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Past Quiz Sessions</h3>
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{quizSessions.length}</span>
+              {quizSessions.length > 0 && (
+                <div className="mt-10 bg-theme-card rounded-2xl border border-theme-primary overflow-hidden shadow-sm text-left">
+                  <div className="p-6 border-b border-theme-primary flex items-center gap-2">
+                    <History size={18} className="text-theme-accent" />
+                    <h3 className="text-sm font-bold text-theme-secondary uppercase tracking-widest">Past Quiz Sessions</h3>
+                    <span className="text-[10px] font-bold text-theme-muted bg-theme-hover px-2 py-0.5 rounded-full">{quizSessions.length}</span>
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                    <SessionList
+                      sessions={quizSessions}
+                      savedUploads={savedUploads}
+                      onReattempt={handleReattemptSession}
+                      onOpenUpload={handleOpenUpload}
+                    />
+                  </div>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                  <SessionList
-                    sessions={quizSessions}
-                    savedUploads={savedUploads}
-                    onReattempt={handleReattemptSession}
-                    onOpenUpload={handleOpenUpload}
-                  />
-                </div>
-              </motion.div>
-            )}
-            <motion.div layout className="mt-16 flex items-center justify-center gap-6 sm:gap-12">
-              <div className="flex flex-col items-center"><div className="text-2xl sm:text-4xl font-extrabold text-indigo-600 mb-1">{stats.streakDays}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Day Streak</div></div>
-              <div className="w-px h-12 bg-slate-200"></div>
-              <div className="flex flex-col items-center"><div className="text-2xl sm:text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Documents</div></div>
-              <div className="w-px h-12 bg-slate-200"></div>
-              <div className="flex flex-col items-center"><div className="text-2xl sm:text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Practice Sets</div></div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {state === AppState.PROCESSING && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh]">
-            <div className="bg-white p-12 rounded-[3rem] shadow-xl shadow-indigo-100/50 flex flex-col items-center border border-slate-100 max-w-md w-full">
-              <div className="relative mb-8">
-                <div className="absolute inset-0 bg-indigo-500/10 rounded-full animate-ping scale-150"></div>
-                <div className="relative bg-white p-4 rounded-full border-2 border-indigo-600">
-                  <Stethoscope className="text-indigo-600" size={48} />
-                </div>
-                <Sparkles className="absolute -top-1 -right-1 text-amber-400 animate-bounce" size={24} />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Optimizing Content</h2>
-              <div className="w-full space-y-4">
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-indigo-600 transition-all duration-[3000ms] ease-linear"
-                    style={{ width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%` }}
-                  />
-                </div>
-                <p className="text-indigo-600 text-sm font-bold text-center tracking-wide uppercase transition-all animate-pulse">
-                  {LOADING_STEPS[loadingStep]}
-                </p>
-                <div className="flex justify-between items-center px-4 pt-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Volume Parsed</span>
-                  <span className="text-[10px] font-bold text-indigo-600">{processedChars > 0 ? `${(processedChars / 1024).toFixed(1)} KB` : 'Initializing...'}</span>
-                </div>
-                <p className="text-slate-400 text-center text-xs px-8 leading-relaxed">
-                  Parsing high-volume clinical data. Large files are safely truncated to ensure maximum AI stability.
-                </p>
+              )}
+              <div className="mt-16 flex items-center justify-center gap-12">
+                <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-theme-accent mb-1">{stats.streakDays}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Day Streak</div></div>
+                <div className="w-px h-12 bg-theme-primary"></div>
+                <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Documents</div></div>
+                <div className="w-px h-12 bg-theme-primary"></div>
+                <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Practice Sets</div></div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {state === AppState.ERROR && (
-          <div className="max-w-xl mx-auto bg-rose-50 border border-rose-100 p-10 rounded-[2rem] text-center">
-            <div className="bg-rose-100 text-rose-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><AlertCircle size={32} /></div>
-            <h2 className="text-2xl font-bold text-rose-800 mb-4">Upload Error</h2>
-            <p className="text-rose-600 mb-8">{errorMessage}</p>
-            <button onClick={() => setState(AppState.IDLE)} className="px-10 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-colors">Return to Home</button>
-          </div>
-        )}
-
-        {state === AppState.VIEWING && (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={viewMode}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="animate-fade-in"
-            >
-              <div className="mb-8">{renderContent()}</div>
-            </motion.div>
-          </AnimatePresence>
-        )}
-      </main>
-
-      <footer className="bg-transparent py-8 mt-auto border-t border-slate-200/50">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-slate-400 text-xs font-medium flex items-center gap-1.5">
-              Support this project with a <Heart size={12} className="text-indigo-500 fill-indigo-500" />
-            </p>
-            <div className="bg-white/50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-3">
-              <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Zelle</span>
-              <span className="text-slate-700 font-bold text-sm">3175310381</span>
+          {state === AppState.PROCESSING && (
+            <div className="flex flex-col items-center justify-center min-h-[50vh]">
+              <div className="bg-theme-card p-12 rounded-[3rem] shadow-xl shadow-theme-accent/10 flex flex-col items-center border border-theme-primary max-w-md w-full">
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 bg-theme-accent/10 rounded-full animate-ping scale-150"></div>
+                  <div className="relative bg-theme-card p-4 rounded-full border-2 border-theme-accent">
+                    <Stethoscope className="text-theme-accent" size={48} />
+                  </div>
+                  <Sparkles className="absolute -top-1 -right-1 text-amber-400 animate-bounce" size={24} />
+                </div>
+                <h2 className="text-2xl font-bold text-theme-primary mb-4 text-center">Optimizing Content</h2>
+                <div className="w-full space-y-4">
+                  <div className="h-2 bg-theme-hover rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-theme-accent transition-all duration-[3000ms] ease-linear"
+                      style={{ width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-theme-accent text-sm font-bold text-center tracking-wide uppercase transition-all animate-pulse">
+                    {LOADING_STEPS[loadingStep]}
+                  </p>
+                  <div className="flex justify-between items-center px-4 pt-2">
+                    <span className="text-[10px] font-bold text-theme-muted uppercase tracking-widest">Volume Parsed</span>
+                    <span className="text-[10px] font-bold text-theme-accent">{processedChars > 0 ? `${(processedChars / 1024).toFixed(1)} KB` : 'Initializing...'}</span>
+                  </div>
+                  <p className="text-theme-muted text-center text-xs px-8 leading-relaxed">
+                    Parsing high-volume clinical data. Large files are safely truncated to ensure maximum AI stability.
+                  </p>
+                </div>
+              </div>
             </div>
-            <p className="text-[10px] text-slate-300 uppercase tracking-widest mt-2">StudyGenius AI © 2024</p>
+          )}
+
+          {state === AppState.ERROR && (
+            <div className="max-w-xl mx-auto bg-rose-50 border border-rose-100 p-10 rounded-[2rem] text-center">
+              <div className="bg-rose-100 text-rose-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><AlertCircle size={32} /></div>
+              <h2 className="text-2xl font-bold text-rose-800 mb-4">Upload Error</h2>
+              <p className="text-rose-600 mb-8">{errorMessage}</p>
+              <button onClick={() => setState(AppState.IDLE)} className="px-10 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-colors">Return to Home</button>
+            </div>
+          )}
+
+          {state === AppState.VIEWING && <div className="animate-fade-in"><div className="mb-8">{renderContent()}</div></div>}
+        </main>
+
+        <footer className="bg-transparent py-8 mt-auto border-t border-theme-primary/50">
+          <div className="max-w-7xl mx-auto px-4 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-theme-muted text-xs font-medium flex items-center gap-1.5">
+                Support this project with a <Heart size={12} className="text-theme-accent fill-theme-accent" />
+              </p>
+              <div className="bg-theme-card/50 border border-theme-primary px-4 py-1.5 rounded-full flex items-center gap-3">
+                <span className="text-[10px] font-bold text-theme-accent uppercase tracking-widest">Zelle</span>
+                <span className="text-theme-primary font-bold text-sm">3175310381</span>
+              </div>
+              <p className="text-[10px] text-theme-muted uppercase tracking-widest mt-2">StudyGenius AI © 2024</p>
+            </div>
           </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </ThemeProvider>
   );
 };
 

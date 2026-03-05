@@ -14,30 +14,15 @@ export interface Flashcard {
   nextReview?: number; // Unix timestamp for next review
 }
 
-export type QuestionType = 'multiple-choice' | 'labeling' | 'matching';
-
-export interface ImageLabel {
-  id: string;
-  label: string;
-  x: number; // percentage 0-100
-  y: number; // percentage 0-100
-}
-
-export interface MatchingPair {
-  id: string;
-  left: string;
-  right: string;
-}
-
 export interface QuizQuestion {
   question: string;
-  options: string[];
-  correctAnswer: number;
+  type?: 'multiple-choice' | 'labeling' | 'matching';
+  options?: string[];
+  correctAnswer?: number;
   explanation: string;
   subtopic?: string;
-  type?: QuestionType;
-  imageLabels?: ImageLabel[];
-  matchingPairs?: MatchingPair[];
+  imageLabels?: { id: string; label: string }[];
+  matchingPairs?: { id: string; left: string; right: string }[];
 }
 
 export interface StudyMaterial {
@@ -63,10 +48,10 @@ export interface Achievement {
   title: string;
   description: string;
   icon: 'Zap' | 'Star' | 'Award' | 'BookOpen' | 'Cpu' | 'Moon' | 'Flame' | 'Target' | 'Heart' | 'Stethoscope';
-  rarity: 'bronze' | 'silver' | 'gold';
   unlocked: boolean;
   requirement: number;
   currentValue: number;
+  rarity?: 'bronze' | 'silver' | 'gold';
 }
 
 export interface StudyGoal {
@@ -83,9 +68,7 @@ export interface UserStats {
   perfectQuizzes: number;
   streakDays: number;
   lastActive: string;
-  usedDomains: string[];
-  dailyStudyCount: number;
-  currentPerfectStreak: number;
+  currentPerfectStreak?: number;
 }
 
 export enum AppState {
@@ -119,27 +102,30 @@ export interface ProcessingState {
   fileName: string;
 }
 
-export interface UploadSource {
-  fileName: string;
-  sourceType: 'text' | 'pdf' | 'image';
-  sourceText?: string;
-  sourceDataUrl?: string;
-  sourceMimeType?: string;
-}
-
 export interface SavedUpload {
   id: string;
-  fileName: string; // Primary file or batch name
+  fileName: string;
   title: string;
   domain: StudyDomain;
   createdAt: string;
   material: StudyMaterial;
-  sources: UploadSource[];
+  sourceType: 'text' | 'pdf' | 'image';
+  sourceText?: string;
+  sourceDataUrl?: string;
+  sourceMimeType?: string;
+  sources?: { fileName?: string; sourceDataUrl?: string; }[];
 }
 
-export interface ContentPart {
-  type: 'text' | 'image';
-  data: string;
-  fileName?: string;
-  mimeType?: string;
+// Theme types
+export type ThemeColor = 'light' | 'dark' | 'pink' | 'ocean' | 'emerald';
+
+export interface ThemeConfig {
+  id: ThemeColor;
+  name: string;
+  icon: string;
+  preview: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
 }

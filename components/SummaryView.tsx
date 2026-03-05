@@ -22,7 +22,27 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
   // Parse summary to extract structured sections - more flexible
   const parseSummary = (text: string): StudySection[] => {
     const sections: StudySection[] = [];
-    const lines = text.split('\n');
+
+    // First, normalize the text by inserting newlines before section headers
+    const sectionHeaders = [
+      'Big Picture Question:',
+      'Key Concepts & Definitions:',
+      'Key Concepts:',
+      'Comparison Table:',
+      'Test Yourself:',
+      'Common Misconception:',
+      'Common Misconceptions:',
+      'Essential Question:'
+    ];
+
+    let normalizedText = text;
+    for (const header of sectionHeaders) {
+      // Insert newline before each header (case-insensitive)
+      const regex = new RegExp(`(?<!^)(?=${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      normalizedText = normalizedText.replace(regex, '\n\n');
+    }
+
+    const lines = normalizedText.split('\n');
     let currentSection: StudySection | null = null;
     let tableLines: string[] = [];
     let isTable = false;
@@ -43,11 +63,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
         continue;
       }
 
-      // Check if this is a section header (more flexible: check for keywords or ends with colon)
-      const headerKeywords = ['big picture', 'key concept', 'comparison table', 'test yourself', 'misconception', 'essential question'];
-      const startsWithKeyword = headerKeywords.some(kw => line.toLowerCase().startsWith(kw));
-      const hasColon = line.includes(':');
-      const isSectionHeader = (startsWithKeyword || line.endsWith(':')) && !line.includes('|');
+      // Check if this is a section header (key indicator: ends with colon)
+      const isSectionHeader = line.endsWith(':') && !line.includes('|');
 
       if (isSectionHeader) {
         // Save any table in progress
@@ -66,7 +83,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
 
         // Check if there's content after the colon on the same line
         const colonIndex = line.indexOf(':');
-        const inlineContent = line.substring(colonIndex + 1).trim();
+        let inlineContent = line.substring(colonIndex + 1).trim();
+
+        // For sections with | delimited content, split items onto separate lines
+        // Pattern: "Term1 | Def1Term2 | Def2" -> split before uppercase letter followed by | 
+        if (inlineContent.includes('|')) {
+          // Split on pattern where we have text ending followed by a capital letter and word before |
+          inlineContent = inlineContent.replace(/([.!?])([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*\|/g, '$1\n$2 |');
+          // Also split numbered items
+          inlineContent = inlineContent.replace(/(\.)(\d+\.)/g, '$1\n$2');
+        }
 
         if (headerLower.includes('big picture') || headerLower.includes('essential question')) {
           currentSection = { type: 'question', content: inlineContent };
@@ -158,32 +184,32 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
   };
 
   return (
-    <div className="bg-white rounded-2xl md:shadow-sm border border-slate-100 p-5 md:p-8 max-w-4xl mx-auto animate-fade-in space-y-4 md:space-y-6">
+    <div className="bg-theme-card rounded-2xl shadow-sm border border-theme-primary p-8 max-w-4xl mx-auto animate-fade-in space-y-6">
       {/* Header */}
-      <div className="border-b-2 border-indigo-200 pb-4 md:pb-6">
-        <div className="flex items-start gap-2 md:gap-3">
-          <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-indigo-600 flex-shrink-0 mt-1" />
+      <div className="border-b-2 border-theme-accent pb-6">
+        <div className="flex items-start gap-3">
+          <BookOpen className="w-8 h-8 text-theme-accent flex-shrink-0 mt-1" />
           <div>
-            <h1 className="text-2xl md:text-4xl font-bold text-slate-800">{title}</h1>
-            <p className="text-slate-500 text-xs md:text-sm mt-1">📚 Effective Study Guide</p>
+            <h1 className="text-4xl font-bold text-theme-primary">{title}</h1>
+            <p className="text-theme-muted text-sm mt-1">📚 Effective Study Guide</p>
           </div>
         </div>
       </div>
 
       {/* Content Coverage Indicator */}
       {contentCoveragePercent && contentCoveragePercent < 100 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 md:p-5">
+        <div className="bg-gradient-to-r from-theme-accent-bg to-theme-tertiary border border-theme-secondary rounded-lg p-5">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-blue-900 mb-2 text-sm md:text-base">Content Coverage: {contentCoveragePercent}%</p>
-              <div className="w-full bg-blue-200 rounded-full h-2 md:h-2.5">
+              <p className="font-semibold text-blue-900 mb-2">Content Coverage: {contentCoveragePercent}%</p>
+              <div className="w-full bg-blue-200 rounded-full h-2.5">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 md:h-2.5 rounded-full transition-all"
+                  className="bg-gradient-to-r from-blue-500 to-theme-accent-secondary h-2.5 rounded-full transition-all"
                   style={{ width: `${contentCoveragePercent}%` }}
                 />
               </div>
-              <p className="text-[10px] md:text-xs text-blue-700 mt-2 md:mt-3">
+              <p className="text-xs text-blue-700 mt-3">
                 {hasUnprocessedContent
                   ? '📚 More content available! Tap "Generate More" to create additional study materials.'
                   : '✓ All content processed.'}
@@ -194,37 +220,37 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
       )}
 
       {/* Study Guide Sections */}
-      <div className="space-y-3 md:space-y-4">
+      <div className="space-y-4">
         {sections.map((section, idx) => {
           const isExpanded = expandedSections.has(idx);
 
           if (section.type === 'question') {
             return (
-              <div key={idx} className="bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-600 p-4 md:p-5 rounded">
-                <h3 className="font-bold text-base md:text-lg text-purple-900 mb-2">❓ Key Question</h3>
-                <p className="text-sm md:text-base text-purple-800">{section.content}</p>
+              <div key={idx} className="bg-gradient-to-r from-theme-hover to-theme-accent-bg border-l-4 border-theme-accent p-5 rounded">
+                <h3 className="font-bold text-lg text-purple-900 mb-2">❓ Key Question</h3>
+                <p className="text-purple-800">{section.content}</p>
               </div>
             );
           }
 
           if (section.type === 'misconception') {
             return (
-              <div key={idx} className="bg-red-50 border-l-4 border-red-500 p-4 md:p-5 rounded">
-                <h3 className="font-bold text-base md:text-lg text-red-900 mb-2">⚠️ Common Misconception</h3>
-                <p className="text-sm md:text-base text-red-800 whitespace-pre-wrap">{section.content}</p>
+              <div key={idx} className="bg-red-50 border-l-4 border-red-500 p-5 rounded">
+                <h3 className="font-bold text-lg text-red-900 mb-2">⚠️ Common Misconception</h3>
+                <p className="text-red-800 whitespace-pre-wrap">{section.content}</p>
               </div>
             );
           }
 
           if (section.type === 'table') {
             return (
-              <div key={idx} className="table-container border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full text-sm md:text-base">
+              <div key={idx} className="border border-theme-secondary rounded-lg overflow-hidden">
+                <table className="w-full">
                   <tbody>
                     {section.tableData?.map((row, rowIdx) => (
-                      <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-slate-50' : 'bg-white'}>
-                        <td className="px-3 md:px-4 py-3 font-semibold text-indigo-700 border-r border-slate-200 min-w-[120px]">{row.left}</td>
-                        <td className="px-3 md:px-4 py-3 text-slate-700">{row.right}</td>
+                      <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-theme-hover' : 'bg-theme-card'}>
+                        <td className="px-4 py-3 font-semibold text-theme-accent border-r border-theme-secondary">{row.left}</td>
+                        <td className="px-4 py-3 text-theme-secondary">{row.right}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -235,19 +261,19 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ summary, title, conten
 
           // Collapsible sections
           return (
-            <div key={idx} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+            <div key={idx} className="border border-theme-secondary rounded-lg overflow-hidden">
               <button
                 onClick={() => toggleSection(idx)}
-                className="w-full px-4 md:px-5 py-3 md:py-4 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 text-left font-semibold text-slate-800 flex items-center justify-between transition-colors"
+                className="w-full px-5 py-4 bg-gradient-to-r from-theme-hover to-theme-tertiary hover:from-theme-tertiary hover:to-theme-secondary text-left font-semibold text-theme-primary flex items-center justify-between transition-colors"
               >
-                <span className="flex items-center gap-2 text-sm md:text-base">
-                  {section.type === 'section' && <Target className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" />}
+                <span className="flex items-center gap-2">
+                  {section.type === 'section' && <Target className="w-5 h-5 text-theme-accent" />}
                   {section.title}
                 </span>
-                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               </button>
               {isExpanded && (
-                <div className="px-4 md:px-5 py-3 md:py-4 bg-white border-t border-slate-200 text-slate-700 whitespace-pre-wrap leading-relaxed text-sm md:text-base font-medium">
+                <div className="px-5 py-4 bg-theme-card border-t border-theme-secondary text-theme-secondary whitespace-pre-wrap leading-relaxed">
                   {section.content}
                 </div>
               )}

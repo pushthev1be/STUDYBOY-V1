@@ -1,0 +1,78 @@
+{
+  "required": [
+    "id"
+  ],
+  "properties": {
+    "id": {
+      "description": "Note:\nThis is a Primary Key.<pk/>",
+      "format": "text",
+      "type": "string"
+    },
+    "user_id": {
+      "format": "text",
+      "type": "string"
+    },
+    "topic": {
+      "format": "text",
+      "type": "string"
+    },
+    "score": {
+      "format": "integer",
+      "type": "integer"
+    },
+    "total": {
+      "format": "integer",
+      "type": "integer"
+    },
+    "data": {
+      "format": "jsonb"
+    },
+    "created_at": {
+      "default": "now()",
+      "format": "timestamp with time zone",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
+
+{
+  "required": [
+    "id"
+  ],
+  "properties": {
+    "id": {
+      "description": "Note:\nThis is a Primary Key.<pk/>",
+      "format": "text",
+      "type": "string"
+    },
+    "user_id": {
+      "format": "text",
+      "type": "string"
+    },
+    "file_name": {
+      "format": "text",
+      "type": "string"
+    },
+    "title": {
+      "format": "text",
+      "type": "string"
+    },
+    "domain": {
+      "format": "text",
+      "type": "string"
+    },
+    "material": {
+      "format": "jsonb"
+    },
+    "sources": {
+      "format": "jsonb"
+    },
+    "created_at": {
+      "default": "now()",
+      "format": "timestamp with time zone",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}

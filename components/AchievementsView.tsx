@@ -30,8 +30,8 @@ const RARITY_CONFIG = {
     label: 'BRONZE'
   },
   silver: {
-    bg: 'bg-slate-50 border-slate-200',
-    iconBg: 'bg-slate-200 text-slate-700',
+    bg: 'bg-theme-hover border-theme-secondary',
+    iconBg: 'bg-theme-secondary text-theme-secondary',
     badge: 'bg-slate-400 text-white',
     label: 'SILVER'
   },
@@ -50,17 +50,17 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({ achievements
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
           { label: 'Uploads', value: stats.totalUploads, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-50' },
-          { label: 'Quizzes', value: stats.totalQuizzesCompleted, icon: Star, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+          { label: 'Quizzes', value: stats.totalQuizzesCompleted, icon: Star, color: 'text-theme-accent', bg: 'bg-theme-accent-bg' },
           { label: 'Streak', value: `${stats.streakDays}d`, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50' },
           { label: 'Flashcards', value: stats.totalFlashcardsViewed, icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50' },
           { label: 'Avg Skill', value: stats.currentPerfectStreak > 0 ? `${stats.currentPerfectStreak}x 🔥` : stats.perfectQuizzes, icon: Medal, color: 'text-rose-500', bg: 'bg-rose-50' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+          <div key={i} className="bg-theme-card p-6 rounded-3xl border border-theme-primary shadow-sm flex flex-col items-center text-center">
             <div className={`${stat.bg} ${stat.color} w-10 h-10 rounded-xl flex items-center justify-center mb-4`}>
               <stat.icon size={20} />
             </div>
-            <div className="text-2xl font-bold text-slate-800">{stat.value}</div>
-            <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">{stat.label}</div>
+            <div className="text-2xl font-bold text-theme-primary">{stat.value}</div>
+            <div className="text-xs text-theme-tertiary font-bold uppercase tracking-wider">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -69,21 +69,21 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({ achievements
         {/* Goals Section */}
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <Target className="text-indigo-600" size={28} />
-            <h2 className="text-2xl font-bold text-slate-800">Daily Missions</h2>
+            <Target className="text-theme-accent" size={28} />
+            <h2 className="text-2xl font-bold text-theme-primary">Daily Missions</h2>
           </div>
           <div className="space-y-6">
             {goals.map((goal) => (
-              <div key={goal.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+              <div key={goal.id} className="bg-theme-card p-6 rounded-3xl border border-theme-primary shadow-sm">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-semibold text-slate-700">{goal.label}</h3>
-                  <span className="text-sm font-bold text-indigo-600">
+                  <h3 className="font-semibold text-theme-secondary">{goal.label}</h3>
+                  <span className="text-sm font-bold text-theme-accent">
                     {goal.current} / {goal.target}
                   </span>
                 </div>
-                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                <div className="w-full bg-theme-tertiary h-3 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-indigo-500 transition-all duration-500"
+                    className="h-full bg-theme-accent transition-all duration-500"
                     style={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }}
                   />
                 </div>
@@ -102,7 +102,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({ achievements
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <Trophy className="text-amber-500" size={28} />
-              <h2 className="text-2xl font-bold text-slate-800">Hall of Fame</h2>
+              <h2 className="text-2xl font-bold text-theme-primary">Hall of Fame</h2>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4">
@@ -115,27 +115,27 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({ achievements
                   key={achievement.id}
                   className={`flex items-center gap-4 md:gap-6 p-5 rounded-3xl border transition-all ${achievement.unlocked
                     ? `${config.bg || ''} shadow-sm`
-                    : 'bg-slate-50 border-slate-200 grayscale opacity-40'
+                    : 'bg-theme-hover border-theme-secondary grayscale opacity-40'
                     }`}
                 >
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${achievement.unlocked ? (config.iconBg || '') : 'bg-slate-200 text-slate-400'
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${achievement.unlocked ? (config.iconBg || '') : 'bg-theme-secondary text-theme-tertiary'
                     }`}>
                     <IconComp size={28} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="font-bold text-slate-800 line-clamp-1">{achievement.title}</h3>
+                      <h3 className="font-bold text-theme-primary line-clamp-1">{achievement.title}</h3>
                       {achievement.unlocked && (
                         <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-tighter ${config.badge}`}>
                           {config.label}
                         </span>
                       )}
                     </div>
-                    <p className="text-slate-500 text-[11px] md:text-xs leading-tight">{achievement.description}</p>
+                    <p className="text-theme-muted text-[11px] md:text-xs leading-tight">{achievement.description}</p>
                   </div>
                   {achievement.unlocked && (
                     <div className={achievement.rarity === 'gold' ? 'text-amber-500' :
-                      achievement.rarity === 'silver' ? 'text-slate-400' : 'text-orange-700'}>
+                      achievement.rarity === 'silver' ? 'text-theme-tertiary' : 'text-orange-700'}>
                       <Medal size={20} />
                     </div>
                   )}
