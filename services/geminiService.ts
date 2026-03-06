@@ -184,14 +184,15 @@ function fixTruncatedJson(text: string): string {
   return fixed;
 }
 
-// Safe JSON parse with truncation fix
+// Safe JSON parse with truncation fix AND validation
 function safeJsonParse<T>(text: string | undefined, fallback: T): T {
   if (!text || text.trim().length === 0) {
     return fallback;
   }
   
   try {
-    return JSON.parse(text) as T;
+    const parsed = JSON.parse(text) as T;
+    return parsed;
   } catch {
     console.warn("JSON parse failed, attempting to fix truncated response");
     try {
@@ -201,6 +202,37 @@ function safeJsonParse<T>(text: string | undefined, fallback: T): T {
       return fallback;
     }
   }
+}
+
+// Validate and fix quiz questions
+function validateAndFixQuestions(questions: any[]): QuizQuestion[] {
+  return questions.map(q => {
+    // Ensure correctAnswer is a valid 0-based index
+    let correctAnswer = q.correctAnswer;
+    
+    // Handle string indices (AI sometimes returns "0" instead of 0)
+    if (typeof correctAnswer === 'string') {
+      correctAnswer = parseInt(correctAnswer, 10);
+    }
+    
+    // Handle 1-based indexing (AI sometimes uses 1, 2, 3, 4)
+    if (correctAnswer >= 1 && correctAnswer > q.options.length / 2) {
+      correctAnswer = correctAnswer - 1;
+    }
+    
+    // Ensure it's within valid range
+    if (correctAnswer < 0 || correctAnswer >= q.options.length) {
+      console.warn(`Invalid correctAnswer index ${q.correctAnswer} for question with ${q.options.length} options. Defaulting to 0.`);
+      correctAnswer = 0;
+    }
+    
+    return {
+      ...q,
+      correctAnswer,
+      explanation: q.explanation || "Review this concept carefully.",
+      subtopic: q.subtopic || "General"
+    };
+  });
 }
 
 // Retry logic with exponential backoff
@@ -265,7 +297,9 @@ Test Yourself:
 Common Misconception:
 [misconception text]
 
-Also generate 10 quiz questions (each with a "subtopic" field like "Pathophysiology") and 30 flashcard pairs.`
+Also generate 10 quiz questions (each with a "subtopic" field like "Pathophysiology") and 30 flashcard pairs.
+
+IMPORTANT FOR QUIZ QUESTIONS: The "correctAnswer" field MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`
     : `Analyze these notes and generate a structured study guide. Format the summary with NEWLINES between each section and between each item:
 
 Big Picture Question:
@@ -291,7 +325,9 @@ Common Misconception:
 NOTES:
 ${content}
 
-Generate 10 quiz questions (each with a "subtopic" field like "Pathophysiology", "Pharmacology", "Diagnosis") and 30 flashcard pairs.`;
+Generate 10 quiz questions (each with a "subtopic" field like "Pathophysiology", "Pharmacology", "Diagnosis") and 30 flashcard pairs.
+
+IMPORTANT FOR QUIZ QUESTIONS: The "correctAnswer" field MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -318,6 +354,10 @@ Generate 10 quiz questions (each with a "subtopic" field like "Pathophysiology",
       const result = safeJsonParse<StudyMaterial>(responseText, FALLBACK_STUDY_MATERIAL);
       
       if (!result.title || !result.summary) throw new Error("Invalid response structure");
+      
+      // Validate and fix quiz questions
+      result.quiz = validateAndFixQuestions(result.quiz);
+      
       return result;
     });
   } catch (error) {
@@ -330,7 +370,9 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 || '' });
   const model = 'gemini-2.5-flash';
 
-  const prompt = `Generate 5 new board-style questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology"). Vary difficulty and scenarios. Include clinical vignettes, plausible distractors, and concise explanations.`;
+  const prompt = `Generate 5 new board-style questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology"). Vary difficulty and scenarios. Include clinical vignettes, plausible distractors, and concise explanations.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -345,11 +387,12 @@ export async function extendQuiz(currentTopic: string, existingCount: number): P
         },
       });
 
-      return safeJsonParse<QuizQuestion[]>(response.text, FALLBACK_QUIZ);
+      const questions = safeJsonParse<QuizQuestion[]>(response.text, FALLBACK_QUIZ);
+      return validateAndFixQuestions(questions);
     });
   } catch (error) {
     console.error("Gemini Extension Error:", error);
-    return FALLBACK_QUIZ;
+    return validateAndFixQuestions(FALLBACK_QUIZ);
   }
 }
 
@@ -357,7 +400,9 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 || '' });
   const model = 'gemini-2.5-flash';
 
-  const prompt = `Student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different angles. Include a "subtopic" field, clinical vignettes, and explanations that clarify the misconception.`;
+  const prompt = `Student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different angles. Include a "subtopic" field, clinical vignettes, and explanations that clarify the misconception.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
 
   try {
     return await retryWithBackoff(async () => {
@@ -372,11 +417,12 @@ export async function generateQuestionForFailure(currentTopic: string): Promise<
         },
       });
 
-      return safeJsonParse<QuizQuestion[]>(response.text, FALLBACK_QUIZ.slice(0, 2));
+      const questions = safeJsonParse<QuizQuestion[]>(response.text, FALLBACK_QUIZ.slice(0, 2));
+      return validateAndFixQuestions(questions);
     });
   } catch (error) {
     console.error("Generate Question for Failure Error:", error);
-    return FALLBACK_QUIZ.slice(0, 2);
+    return validateAndFixQuestions(FALLBACK_QUIZ.slice(0, 2));
   }
 }
 
@@ -404,5 +450,109 @@ export async function generateAdditionalFlashcards(topic: string): Promise<any[]
   } catch (error) {
     console.error("Generate Additional Flashcards Error:", error);
     return [];
+  }
+}
+
+export async function generateWrongAnswerFeedback(
+  question: string,
+  selectedAnswer: string,
+  correctAnswer: string,
+  allOptions: string[],
+  explanation: string
+): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 || '' });
+  const model = 'gemini-2.5-flash';
+
+  const prompt = `A student answered the following question incorrectly:
+
+Question: ${question}
+
+Options:
+${allOptions.map((opt, idx) => `${String.fromCharCode(65 + idx)}. ${opt}`).join('\n')}
+
+Student selected: "${selectedAnswer}"
+Correct answer: "${correctAnswer}"
+
+Original explanation: "${explanation}"
+
+Provide a brief, focused explanation of:
+1. Why the student's answer ("${selectedAnswer}") is incorrect
+2. Why the correct answer ("${correctAnswer}") is right
+
+Keep it concise (2-3 sentences) and address the specific misconception the student likely had. Format as plain text, not as a list.`;
+
+  try {
+    return await retryWithBackoff(async () => {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user' as const, parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          maxOutputTokens: 500
+        },
+      });
+
+      return response.text || explanation;
+    });
+  } catch (error) {
+    console.error("Generate Wrong Answer Feedback Error:", error);
+    return explanation;
+  }
+}
+
+export async function generateFreshQuiz(material: StudyMaterial, domain: StudyDomain = 'PA'): Promise<StudyMaterial> {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 || '' });
+  const model = 'gemini-2.5-flash';
+  const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
+
+  const prompt = `Generate fresh study materials based on this existing material:
+
+Title: "${material.title}"
+
+Summary: "${material.summary}"
+
+Create entirely new content (different from any seen before) covering the key concepts. Generate:
+1. 10 new, challenging board-style quiz questions with clinical scenarios
+2. 30 new flashcard pairs covering different aspects
+
+Each quiz question should include:
+- A realistic clinical vignette or scenario
+- 4 plausible options with common misconceptions as distractors
+- A clear, educational explanation
+- A "subtopic" field for organization (e.g. Pathophysiology, Pharmacology, Diagnosis)
+
+IMPORTANT: The "correctAnswer" field for quiz questions MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.
+
+Return as JSON with "quiz" array and "flashcards" array.`;
+
+  try {
+    return await retryWithBackoff(async () => {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user' as const, parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: STUDY_MATERIAL_SCHEMA,
+          maxOutputTokens: 16000
+        },
+      });
+
+      const result = safeJsonParse<StudyMaterial>(response.text, FALLBACK_STUDY_MATERIAL);
+      
+      // Validate and fix quiz questions
+      if (result.quiz) {
+        result.quiz = validateAndFixQuestions(result.quiz);
+      }
+      
+      return {
+        ...result,
+        title: material.title,
+        summary: material.summary
+      };
+    });
+  } catch (error) {
+    console.error("Generate Fresh Quiz Error:", error);
+    return FALLBACK_STUDY_MATERIAL;
   }
 }

@@ -1,5 +1,6 @@
 
 export interface User {
+  id?: string;
   username: string;
   email: string;
   joinedAt: string;
@@ -40,6 +41,7 @@ export interface QuestionStatus {
   selectedOption: number | null;
   isFlagged: boolean;
   showExplanation: boolean;
+  customExplanation?: string;
 }
 
 export interface Achievement {

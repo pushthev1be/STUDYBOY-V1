@@ -17,6 +17,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { SessionList } from './SessionList';
+import { generateWrongAnswerFeedback } from '../services/geminiService';
 
 interface QuizViewProps {
   questions: QuizQuestion[];
@@ -28,6 +29,8 @@ interface QuizViewProps {
   savedUploads?: SavedUpload[];
   onReattemptSession?: (session: QuizSession) => void;
   onOpenUpload?: (upload: SavedUpload) => void;
+  onRegenerateQuiz?: (upload: SavedUpload) => void;
+  resetKey?: string;
 }
 
 export const QuizView: React.FC<QuizViewProps> = ({
@@ -40,15 +43,49 @@ export const QuizView: React.FC<QuizViewProps> = ({
   savedUploads = [],
   onReattemptSession,
   onOpenUpload,
+  onRegenerateQuiz,
+  resetKey,
 }) => {
   const safeQuestions = Array.isArray(questions) ? questions : [];
   const [sessionStates, setSessionStates] = useState<QuestionStatus[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  
+  // Create a stable quiz ID based on the questions to track progress
+  const quizId = React.useMemo(() => {
+    if (safeQuestions.length === 0) return null;
+    // Use first and last question text as a simple hash to identify this quiz
+    return `quiz_${safeQuestions.length}_${safeQuestions[0]?.question.substring(0, 20)}`;
+  }, [safeQuestions.length]);
 
   // Initialize and sync states when questions array grows
   useEffect(() => {
+    // Clear any previously saved state for different quizzes
+    const allKeys = Object.keys(sessionStorage);
+    allKeys.forEach(key => {
+      if (key.startsWith('quiz_') && key !== quizId) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    
+    // Try to restore from session storage first
+    if (quizId) {
+      const savedStates = sessionStorage.getItem(quizId);
+      if (savedStates) {
+        try {
+          const restored = JSON.parse(savedStates);
+          if (Array.isArray(restored) && restored.length === safeQuestions.length) {
+            setSessionStates(restored);
+            return;
+          }
+        } catch (e) {
+          console.warn("Could not restore quiz progress:", e);
+        }
+      }
+    }
+    
+    // If no saved state, initialize new states
     setSessionStates(prev => {
       const newStates = [...prev];
       for (let i = prev.length; i < safeQuestions.length; i++) {
@@ -63,7 +100,14 @@ export const QuizView: React.FC<QuizViewProps> = ({
       }
       return newStates;
     });
-  }, [safeQuestions]);
+  }, [safeQuestions.length, quizId, resetKey]);
+
+  // Save quiz progress whenever it changes
+  useEffect(() => {
+    if (quizId && sessionStates.length > 0) {
+      sessionStorage.setItem(quizId, JSON.stringify(sessionStates));
+    }
+  }, [sessionStates, quizId]);
 
   const stats = useMemo(() => {
     const answered = sessionStates.filter(s => s.isAnswered).length;
@@ -114,6 +158,31 @@ export const QuizView: React.FC<QuizViewProps> = ({
     };
     setSessionStates(newStates);
 
+    // Generate targeted feedback for wrong answers
+    if (!isCorrect) {
+      const question = safeQuestions[qIdx];
+      const selectedAnswer = question.options[optionIndex];
+      const correctAnswer = question.options[question.correctAnswer];
+      
+      generateWrongAnswerFeedback(
+        question.question,
+        selectedAnswer,
+        correctAnswer,
+        question.options,
+        question.explanation
+      ).then(feedback => {
+        // Update the state with custom explanation
+        setSessionStates(prevStates => {
+          const updated = [...prevStates];
+          updated[qIdx] = {
+            ...updated[qIdx],
+            customExplanation: feedback
+          };
+          return updated;
+        });
+      });
+    }
+
     // Trigger auto-generate 2 more questions on failure
     if (!isCorrect && onQuestionFailed) {
       onQuestionFailed();
@@ -129,6 +198,10 @@ export const QuizView: React.FC<QuizViewProps> = ({
   const finalizeSession = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsSubmitted(true);
+    // Clear saved progress after quiz is submitted
+    if (quizId) {
+      sessionStorage.removeItem(quizId);
+    }
     if (onQuizComplete) {
       const finalizedStates = sessionStates.map(state => ({ ...state, showExplanation: true }));
       onQuizComplete(stats.correct, stats.total, safeQuestions, finalizedStates);
@@ -136,15 +209,20 @@ export const QuizView: React.FC<QuizViewProps> = ({
   };
 
   const restartSession = () => {
-    setSessionStates(safeQuestions.map((_, i) => ({
+    const resetStates = safeQuestions.map((_, i) => ({
       id: i,
       isAnswered: false,
       isCorrect: null,
       selectedOption: null,
       isFlagged: false,
       showExplanation: false,
-    })));
+    }));
+    setSessionStates(resetStates);
     setIsSubmitted(false);
+    // Save the reset state
+    if (quizId) {
+      sessionStorage.setItem(quizId, JSON.stringify(resetStates));
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -241,6 +319,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
               savedUploads={savedUploads}
               onReattempt={onReattemptSession}
               onOpenUpload={onOpenUpload}
+              onRegenerateQuiz={onRegenerateQuiz}
             />
           )}
 
@@ -320,11 +399,18 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         <div className={`p-2 rounded-lg h-fit ${status.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
                           {status.isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <h4 className="font-bold text-slate-800 mb-1">
                             {status.isCorrect ? 'Correct!' : `The correct answer is "${q.options[q.correctAnswer]}".`}
                           </h4>
-                          <p className="text-slate-600 text-sm leading-relaxed">{q.explanation}</p>
+                          {!status.isCorrect && status.selectedOption !== null && (
+                            <p className="text-sm text-slate-500 mb-3">
+                              You selected: <span className="font-semibold text-slate-700">"{q.options[status.selectedOption]}"</span>
+                            </p>
+                          )}
+                          <p className="text-slate-600 text-sm leading-relaxed">
+                            {status.customExplanation && !status.isCorrect ? status.customExplanation : q.explanation}
+                          </p>
                         </div>
                       </div>
 

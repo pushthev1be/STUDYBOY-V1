@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope, History, Home } from 'lucide-react';
 import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload } from './types';
-import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
+import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards, generateFreshQuiz } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
@@ -113,15 +113,43 @@ const App: React.FC = () => {
   }, [state]);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('sg_user');
+    // Check Supabase session first, then fall back to localStorage
+    const initializeAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session?.user) {
+          // Active Supabase session exists - use it
+          setUser({
+            id: data.session.user.id,
+            username: data.session.user.user_metadata?.username || data.session.user.email?.split('@')[0] || 'User',
+            email: data.session.user.email || '',
+            joinedAt: data.session.user.created_at || new Date().toISOString()
+          });
+          setState(AppState.IDLE);
+        } else {
+          // No Supabase session - check localStorage
+          const savedUser = localStorage.getItem('sg_user');
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+            setState(AppState.IDLE);
+          }
+        }
+      } catch (err) {
+        console.error('Session initialization error:', err);
+        // Fall back to localStorage on error
+        const savedUser = localStorage.getItem('sg_user');
+        if (savedUser) {
+          setUser(JSON.parse(savedUser));
+          setState(AppState.IDLE);
+        }
+      }
+    };
+
     const savedStats = localStorage.getItem('sg_stats');
     const savedAchievements = localStorage.getItem('sg_achievements');
     const savedGoals = localStorage.getItem('sg_goals');
 
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setState(AppState.IDLE);
-    }
     if (savedStats) setStats(JSON.parse(savedStats));
     if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
     if (savedGoals) {
@@ -137,6 +165,8 @@ const App: React.FC = () => {
     if (savedSessions) setQuizSessions(JSON.parse(savedSessions));
     const savedUploads = localStorage.getItem('sg_uploads');
     if (savedUploads) setSavedUploads(JSON.parse(savedUploads));
+
+    initializeAuth();
   }, []);
 
   useEffect(() => {
@@ -466,6 +496,39 @@ const App: React.FC = () => {
     setQuizResetKey(Date.now().toString());
   };
 
+  const handleRegenerateQuiz = async (upload: SavedUpload) => {
+    if (!upload.material) return;
+    
+    setState(AppState.PROCESSING);
+    setLoadingStep(0);
+    try {
+      // Generate fresh study material (quiz + flashcards) from the existing material
+      const freshMaterial = await generateFreshQuiz(upload.material, upload.domain);
+      
+      if (freshMaterial && freshMaterial.quiz && freshMaterial.quiz.length > 0) {
+        // Use the fresh material with original title and summary preserved
+        setMaterial({
+          ...freshMaterial,
+          title: upload.title,
+          summary: upload.material.summary
+        });
+        setSelectedDomain(upload.domain);
+        setViewMode('quiz');
+        setState(AppState.VIEWING);
+        setActiveUploadId(upload.id);
+        setQuizResetKey(Date.now().toString());
+        setShowNotification('🎯 Generated a fresh quiz and flashcards from this material!');
+        setTimeout(() => setShowNotification(null), 4000);
+      }
+    } catch (err) {
+      console.error("Error regenerating quiz:", err);
+      setErrorMessage('Failed to generate fresh materials. Please try again.');
+      setState(AppState.ERROR);
+    } finally {
+      setState(AppState.VIEWING);
+    }
+  };
+
 
   if (state === AppState.AUTH) {
     return <AuthView onAuth={(u) => { setUser(u); setState(AppState.IDLE); }} />;
@@ -541,6 +604,8 @@ const App: React.FC = () => {
           setActiveUploadId(session.uploadId || null);
           setQuizResetKey(Date.now().toString());
         }}
+        onRegenerateQuiz={handleRegenerateQuiz}
+        resetKey={quizResetKey}
         key={quizResetKey}
       />;
       default: return null;
@@ -689,6 +754,7 @@ const App: React.FC = () => {
                     savedUploads={savedUploads}
                     onReattempt={handleReattemptSession}
                     onOpenUpload={handleOpenUpload}
+                    onRegenerateQuiz={handleRegenerateQuiz}
                   />
                 </div>
               </div>

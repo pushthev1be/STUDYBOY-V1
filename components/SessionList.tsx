@@ -13,13 +13,15 @@ interface SessionListProps {
     savedUploads: SavedUpload[];
     onReattempt?: (session: QuizSession) => void;
     onOpenUpload?: (upload: SavedUpload) => void;
+    onRegenerateQuiz?: (upload: SavedUpload) => void;
 }
 
 export const SessionList: React.FC<SessionListProps> = ({
     sessions,
     savedUploads,
     onReattempt,
-    onOpenUpload
+    onOpenUpload,
+    onRegenerateQuiz
 }) => {
     const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
 
@@ -127,6 +129,14 @@ export const SessionList: React.FC<SessionListProps> = ({
                                         className="px-3 py-1.5 bg-theme-accent text-white rounded-lg text-xs font-bold hover:bg-theme-accent-secondary transition-all"
                                     >
                                         Reattempt
+                                    </button>
+                                )}
+                                {onRegenerateQuiz && upload && (
+                                    <button
+                                        onClick={() => onRegenerateQuiz(upload)}
+                                        className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-200 transition-all"
+                                    >
+                                        New Quiz
                                     </button>
                                 )}
                                 <button
