@@ -42,6 +42,17 @@ export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
           } as any);
         }
       } else {
+        // Check if email is already in use by trying to sign in first
+        const { data: existingUser } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (existingUser?.user) {
+          setErrorMsg('This email already has an account. Please log in instead.');
+          return;
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -52,11 +63,18 @@ export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
           }
         });
 
-        if (error) throw error;
-
-        // If email confirmation is required, the user might not be immediately logged in.
-        // But for simplicity, we pass them right through if a session exists
-        if (data.session || data.user) {
+        if (error) {
+          // Check for specific error messages from Supabase
+          if (error.message.includes('User already registered')) {
+            setErrorMsg('This email already has an account. Please log in instead.');
+          } else if (error.message.includes('rate limit')) {
+            setErrorMsg('Too many signup attempts. Please try again in a few minutes.');
+          } else {
+            throw error;
+          }
+        } else if (data.session || data.user) {
+          // If email confirmation is required, the user might not be immediately logged in.
+          // But for simplicity, we pass them right through if a session exists
           onAuth({
             id: data.user?.id || crypto.randomUUID(),
             username: formData.username || formData.email.split('@')[0],

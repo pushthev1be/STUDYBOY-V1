@@ -1,6 +1,5 @@
 
 export interface User {
-  id: string;
   username: string;
   email: string;
   joinedAt: string;
@@ -16,13 +15,10 @@ export interface Flashcard {
 
 export interface QuizQuestion {
   question: string;
-  type?: 'multiple-choice' | 'labeling' | 'matching';
-  options?: string[];
-  correctAnswer?: number;
+  options: string[];
+  correctAnswer: number;
   explanation: string;
   subtopic?: string;
-  imageLabels?: { id: string; label: string }[];
-  matchingPairs?: { id: string; left: string; right: string }[];
 }
 
 export interface StudyMaterial {
@@ -47,11 +43,10 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
-  icon: 'Zap' | 'Star' | 'Award' | 'BookOpen' | 'Cpu' | 'Moon' | 'Flame' | 'Target' | 'Heart' | 'Stethoscope';
+  icon: 'Zap' | 'Star' | 'Award' | 'BookOpen' | 'Cpu' | 'Moon' | 'Flame' | 'Target';
   unlocked: boolean;
   requirement: number;
   currentValue: number;
-  rarity?: 'bronze' | 'silver' | 'gold';
 }
 
 export interface StudyGoal {
@@ -68,7 +63,6 @@ export interface UserStats {
   perfectQuizzes: number;
   streakDays: number;
   lastActive: string;
-  currentPerfectStreak?: number;
 }
 
 export enum AppState {
@@ -113,7 +107,6 @@ export interface SavedUpload {
   sourceText?: string;
   sourceDataUrl?: string;
   sourceMimeType?: string;
-  sources?: { fileName?: string; sourceDataUrl?: string; }[];
 }
 
 // Theme types

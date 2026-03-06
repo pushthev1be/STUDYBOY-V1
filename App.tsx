@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Upload, FileText, BrainCircuit, Layout, Loader2, AlertCircle, Sparkles, Trophy, Target, X, LogOut, Flame, Moon, BookOpen, Star, Award, Zap, Heart, Stethoscope, History, Home } from 'lucide-react';
 import { AppState, StudyMaterial, ViewMode, Achievement, StudyGoal, UserStats, User, ProcessingState, StudyDomain, QuizSession, SavedUpload } from './types';
 import { processStudyContent, extendQuiz, generateQuestionForFailure, generateAdditionalFlashcards } from './services/geminiService';
-import { supabase } from './services/supabaseClient';
 import { SummaryView } from './components/SummaryView';
 import { FlashcardView } from './components/FlashcardView';
 import { QuizView } from './components/QuizView';
@@ -112,11 +111,15 @@ const App: React.FC = () => {
   }, [state]);
 
   useEffect(() => {
-    // Local storage only for non-synced data
+    const savedUser = localStorage.getItem('sg_user');
     const savedStats = localStorage.getItem('sg_stats');
     const savedAchievements = localStorage.getItem('sg_achievements');
     const savedGoals = localStorage.getItem('sg_goals');
 
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+      setState(AppState.IDLE);
+    }
     if (savedStats) setStats(JSON.parse(savedStats));
     if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
     if (savedGoals) {
@@ -128,72 +131,20 @@ const App: React.FC = () => {
         setGoals(g);
       }
     }
-
-    // Supabase auth and data fetching
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        handleUserLogin(session.user);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        handleUserLogin(session.user);
-      } else {
-        setUser(null);
-        setState(AppState.AUTH);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    const savedSessions = localStorage.getItem('sg_quiz_sessions');
+    if (savedSessions) setQuizSessions(JSON.parse(savedSessions));
+    const savedUploads = localStorage.getItem('sg_uploads');
+    if (savedUploads) setSavedUploads(JSON.parse(savedUploads));
   }, []);
 
-  const handleUserLogin = async (authUser: any) => {
-    setUser({
-      id: authUser.id,
-      username: authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'Learner',
-      email: authUser.email || '',
-      joinedAt: authUser.created_at || new Date().toISOString()
-    });
-    setState(AppState.IDLE);
-
-    // Fetch uploads
-    const { data: uploadsData } = await supabase.from('uploads').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
-    if (uploadsData) {
-      setSavedUploads(uploadsData.map(u => ({
-        id: u.id,
-        fileName: u.file_name || 'Document',
-        title: u.title,
-        domain: u.domain || 'PA',
-        createdAt: u.created_at,
-        material: u.material,
-        sourceType: 'text', // Fallback
-        sources: u.sources || []
-      })));
-    }
-
-    // Fetch sessions
-    const { data: sessionsData } = await supabase.from('study_sessions').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
-    if (sessionsData) {
-      setQuizSessions(sessionsData.map(s => ({
-        id: s.id,
-        topic: s.topic,
-        score: s.score,
-        total: s.total,
-        date: s.created_at,
-        questions: s.data?.questions || [],
-        questionStates: s.data?.questionStates || {},
-        uploadId: s.data?.uploadId || undefined
-      })));
-    }
-  };
-
   useEffect(() => {
+    if (user) localStorage.setItem('sg_user', JSON.stringify(user));
     localStorage.setItem('sg_stats', JSON.stringify({ ...stats, lastActive: new Date().toISOString() }));
     localStorage.setItem('sg_achievements', JSON.stringify(achievements));
     localStorage.setItem('sg_goals', JSON.stringify(goals));
-    // We no longer sync sessions and uploads to localstorage on every change
-  }, [stats, achievements, goals]);
+    localStorage.setItem('sg_quiz_sessions', JSON.stringify(quizSessions));
+    localStorage.setItem('sg_uploads', JSON.stringify(savedUploads));
+  }, [user, stats, achievements, goals, quizSessions, savedUploads]);
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -351,46 +302,22 @@ const App: React.FC = () => {
       setActiveUploadId(uploadId);
       setMaterial(nextMaterial);
       setQuizResetKey(Date.now().toString());
-
-      const newUpload: SavedUpload = {
-        id: uploadId,
-        fileName: file.name,
-        title: result.title || file.name,
-        domain: selectedDomain,
-        createdAt: new Date().toISOString(),
-        material: nextMaterial,
-        sourceType,
-        sourceText,
-        sourceDataUrl,
-        sourceMimeType: file.type || undefined
-      };
-
       setSavedUploads(prev => {
         const filtered = prev.filter(upload => !(upload.fileName === file.name && upload.title === (result.title || file.name)));
+        const newUpload: SavedUpload = {
+          id: uploadId,
+          fileName: file.name,
+          title: result.title || file.name,
+          domain: selectedDomain,
+          createdAt: new Date().toISOString(),
+          material: nextMaterial,
+          sourceType,
+          sourceText,
+          sourceDataUrl,
+          sourceMimeType: file.type || undefined
+        };
         return [newUpload, ...filtered].slice(0, 20);
       });
-
-      if (user?.id) {
-        supabase.from('uploads').insert({
-          id: uploadId,
-          user_id: user.id,
-          file_name: newUpload.fileName,
-          title: newUpload.title,
-          domain: newUpload.domain,
-          created_at: newUpload.createdAt,
-          material: newUpload.material,
-          sources: [{
-            fileName: file.name,
-            sourceDataUrl: newUpload.sourceDataUrl,
-            sourceText: newUpload.sourceText,
-            sourceMimeType: newUpload.sourceMimeType,
-            sourceType: newUpload.sourceType
-          }]
-        }).then(({ error }) => {
-          if (error) console.error('Failed to save upload to Supabase', error);
-        });
-      }
-
       setState(AppState.VIEWING);
       updateProgress('upload');
     } catch (error: any) {
@@ -466,14 +393,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    setLoadingStep(0);
-    setState(AppState.PROCESSING); // Show loading temporarily
-    await supabase.auth.signOut();
+  const handleLogout = () => {
     localStorage.removeItem('sg_user');
-    setSavedUploads([]);
-    setQuizSessions([]);
+    localStorage.removeItem('sg_stats');
+    localStorage.removeItem('sg_achievements');
+    localStorage.removeItem('sg_goals');
+    localStorage.removeItem('sg_quiz_sessions');
+    localStorage.removeItem('sg_uploads');
     setUser(null);
+    setState(AppState.IDLE);
+    setMaterial(null);
+    setStats(INITIAL_STATS);
+    setAchievements(INITIAL_ACHIEVEMENTS);
+    setGoals(INITIAL_GOALS);
+    setQuizSessions([]);
+    setSavedUploads([]);
     setState(AppState.AUTH);
   };
 
@@ -530,334 +464,297 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
-    return (
-      <div className="w-full relative min-h-[50vh]">
-        <div className={viewMode === 'stats' ? 'block' : 'hidden'}>
-          <AchievementsView achievements={achievements} goals={goals} stats={stats} />
-        </div>
+    if (viewMode === 'stats') return <AchievementsView achievements={achievements} goals={goals} stats={stats} />;
+    if (!material) return null;
 
-        {material && (
-          <>
-            <div className={viewMode === 'summary' ? 'block' : 'hidden'}>
-              <SummaryView
-                summary={material.summary}
-                title={material.title}
-                contentCoveragePercent={material.contentCoveragePercent}
-                hasUnprocessedContent={!!material.unprocessedContent}
-              />
-            </div>
-
-            <div className={viewMode === 'flashcards' ? 'block' : 'hidden'}>
-              <FlashcardView
-                cards={material.flashcards}
-                topic={material.title}
-                onCardViewed={() => updateProgress('flashcard')}
-                onCardRated={(cardIndex, quality) => {
-                  const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
-                  setMaterial({
-                    ...material,
-                    flashcards: material.flashcards.map((card, idx) =>
-                      idx === cardIndex
-                        ? { ...card, ...updated }
-                        : card
-                    )
-                  });
-                }}
-                onLoadMore={(newCards) => {
-                  setMaterial({
-                    ...material,
-                    flashcards: [...material.flashcards, ...newCards]
-                  });
-                }}
-              />
-            </div>
-
-            <div className={viewMode === 'quiz' ? 'block' : 'hidden'}>
-              <QuizView
-                key={quizResetKey}
-                questions={Array.isArray(material.quiz) ? material.quiz : []}
-                onQuizComplete={(score, total, questions, questionStates) => {
-                  updateProgress('quiz', { perfect: score === total });
-                  const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                    ? crypto.randomUUID()
-                    : Date.now().toString();
-                  const session: QuizSession = {
-                    id: sessionId,
-                    topic: material.title,
-                    score,
-                    total,
-                    date: new Date().toISOString(),
-                    questions: [...questions],
-                    questionStates,
-                    uploadId: activeUploadId || undefined
-                  };
-                  setQuizSessions(prev => [session, ...prev].slice(0, 50));
-
-                  if (user?.id) {
-                    supabase.from('study_sessions').insert({
-                      id: session.id,
-                      user_id: user.id,
-                      topic: session.topic,
-                      score: session.score,
-                      total: session.total,
-                      data: {
-                        questions: session.questions,
-                        questionStates: session.questionStates,
-                        uploadId: session.uploadId
-                      },
-                      created_at: session.date
-                    }).then(({ error }) => {
-                      if (error) console.error('Failed to save session to Supabase', error);
-                    });
-                  }
-                }}
-                onKeepGoing={handleKeepGoing}
-                onQuestionFailed={handleQuestionFailed}
-                isExtending={isExtending}
-                pastSessions={quizSessions}
-                savedUploads={savedUploads}
-                onOpenUpload={handleOpenUpload}
-                onReattemptSession={(session) => {
-                  const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
-                  if ((!session.questions || session.questions.length === 0) && !upload) return;
-                  if (upload) {
-                    handleOpenUpload(upload);
-                  } else if (material) {
-                    setMaterial({
-                      ...material,
-                      title: session.topic,
-                      quiz: session.questions
-                    });
-                    setState(AppState.VIEWING);
-                  }
-                  setViewMode('quiz');
-                  setActiveUploadId(session.uploadId || null);
-                  setQuizResetKey(Date.now().toString());
-                }}
-              />
-            </div>
-          </>
-        )}
-      </div>
-    );
+    switch (viewMode) {
+      case 'summary': return <SummaryView summary={material.summary} title={material.title} contentCoveragePercent={material.contentCoveragePercent} hasUnprocessedContent={!!material.unprocessedContent} />;
+      case 'flashcards': return <FlashcardView
+        cards={material.flashcards}
+        topic={material.title}
+        onCardViewed={() => updateProgress('flashcard')}
+        onCardRated={(cardIndex, quality) => {
+          const updated = { ...calculateNextReview(quality, material.flashcards[cardIndex].interval, material.flashcards[cardIndex].easeFactor) };
+          setMaterial({
+            ...material,
+            flashcards: material.flashcards.map((card, idx) =>
+              idx === cardIndex
+                ? { ...card, ...updated }
+                : card
+            )
+          });
+        }}
+        onLoadMore={(newCards) => {
+          setMaterial({
+            ...material,
+            flashcards: [...material.flashcards, ...newCards]
+          });
+        }}
+      />;
+      case 'quiz': return <QuizView
+        questions={Array.isArray(material.quiz) ? material.quiz : []}
+        onQuizComplete={(score, total, questions, questionStates) => {
+          updateProgress('quiz', { perfect: score === total });
+          const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : Date.now().toString();
+          const session: QuizSession = {
+            id: sessionId,
+            topic: material.title,
+            score,
+            total,
+            date: new Date().toISOString(),
+            questions: [...questions],
+            questionStates,
+            uploadId: activeUploadId || undefined
+          };
+          setQuizSessions(prev => [session, ...prev].slice(0, 50));
+        }}
+        onKeepGoing={handleKeepGoing}
+        onQuestionFailed={handleQuestionFailed}
+        isExtending={isExtending}
+        pastSessions={quizSessions}
+        savedUploads={savedUploads}
+        onOpenUpload={handleOpenUpload}
+        onReattemptSession={(session) => {
+          const upload = session.uploadId ? savedUploads.find(u => u.id === session.uploadId) : undefined;
+          if ((!session.questions || session.questions.length === 0) && !upload) return;
+          if (upload) {
+            handleOpenUpload(upload);
+          } else if (material) {
+            setMaterial({
+              ...material,
+              title: session.topic,
+              quiz: session.questions
+            });
+            setState(AppState.VIEWING);
+          }
+          setViewMode('quiz');
+          setActiveUploadId(session.uploadId || null);
+          setQuizResetKey(Date.now().toString());
+        }}
+        key={quizResetKey}
+      />;
+      default: return null;
+    }
   };
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen bg-theme-primary text-theme-primary flex flex-col">
-        {showNotification && (
-          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-theme-card text-theme-primary px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-slide-down border border-theme-primary">
-            <div className="bg-amber-500 p-2 rounded-lg"><Trophy size={20} className="text-white" /></div>
-            <span className="font-bold">{showNotification}</span>
-            <button onClick={() => setShowNotification(null)} className="ml-2 hover:text-theme-tertiary"><X size={16} /></button>
+    <div className="min-h-screen bg-theme-primary text-theme-primary flex flex-col">
+      {showNotification && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-theme-card text-theme-primary px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-slide-down border border-theme-primary">
+          <div className="bg-amber-500 p-2 rounded-lg"><Trophy size={20} className="text-white" /></div>
+          <span className="font-bold">{showNotification}</span>
+          <button onClick={() => setShowNotification(null)} className="ml-2 hover:text-slate-400"><X size={16} /></button>
+        </div>
+      )}
+
+      <header className="bg-theme-secondary border-b border-theme-primary sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
+            <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-100"><BrainCircuit className="text-white" size={28} /></div>
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight text-theme-primary">StudyGenius<span className="text-theme-accent">AI</span></h1>
+              <p className="text-[10px] text-theme-muted font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-tighter">
+              <Zap size={14} fill="currentColor" /> Flash Engine Active
+            </div>
+            {state !== AppState.IDLE && (
+              <button
+                onClick={() => setState(AppState.IDLE)}
+                className="p-2.5 rounded-2xl bg-theme-secondary text-theme-muted border border-theme-primary hover:bg-theme-hover hover:text-theme-accent transition-all shadow-sm"
+                title="Back to Dashboard"
+              >
+                <Home size={20} />
+              </button>
+            )}
+            {state === AppState.VIEWING && (
+              <div className="hidden md:flex bg-theme-hover p-1.5 rounded-2xl gap-1">
+                {[
+                  { id: 'summary', label: 'Summary', icon: FileText },
+                  { id: 'flashcards', label: 'Flashcards', icon: Layout },
+                  { id: 'quiz', label: 'Quiz', icon: Sparkles },
+                  { id: 'stats', label: 'Progress', icon: Trophy }
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => setViewMode(mode.id as ViewMode)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${viewMode === mode.id ? 'bg-theme-secondary text-theme-accent shadow-sm ring-1 ring-theme-primary' : 'text-theme-muted hover:text-theme-primary hover:bg-theme-secondary/50'
+                      }`}
+                  >
+                    <mode.icon size={18} /> {mode.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2.5 rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-theme-accent/20 text-theme-accent' : 'bg-theme-hover text-theme-muted hover:bg-theme-secondary'}`} title="View Progress & Goals"><Trophy size={24} /></button>
+            <ThemeSwitcher />
+            <button onClick={handleLogout} className="p-2.5 rounded-2xl bg-theme-hover text-theme-muted hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut size={24} /></button>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24">
+        {state === AppState.IDLE && (
+          <div className="max-w-3xl mx-auto text-center animate-fade-in">
+            <div className="mb-12">
+              <h2 className="text-5xl font-extrabold text-theme-primary mb-6 leading-tight">Crush your rotations, <span className="text-transparent bg-clip-text bg-gradient-to-r from-theme-accent to-violet-600">{user?.username}</span></h2>
+              <p className="text-xl text-theme-muted max-w-xl mx-auto leading-relaxed">Upload study materials and generate smart study content tailored to your field.</p>
+            </div>
+
+            {/* Domain Selector */}
+            <div className="mb-8 bg-theme-card rounded-2xl border border-theme-primary p-6 shadow-sm">
+              <label className="block text-sm font-bold text-theme-secondary mb-4">What are you studying for?</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {(['PA', 'Nursing', 'Medical', 'GenEd'] as const).map((domain) => (
+                  <button
+                    key={domain}
+                    onClick={() => setSelectedDomain(domain)}
+                    className={`py-3 px-4 rounded-xl font-bold transition-all ${selectedDomain === domain
+                      ? 'bg-theme-accent text-white shadow-lg'
+                      : 'bg-theme-hover text-theme-secondary hover:bg-theme-secondary/20'
+                      }`}
+                  >
+                    {domain === 'PA' && 'PA (PANCE)'}
+                    {domain === 'Nursing' && 'Nursing (NCLEX)'}
+                    {domain === 'Medical' && 'Medical (USMLE)'}
+                    {domain === 'GenEd' && 'General'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative group">
+              <label className="flex flex-col items-center justify-center w-full h-80 border-2 border-dashed border-theme-primary rounded-[3rem] bg-theme-card hover:bg-theme-hover hover:border-theme-accent transition-all cursor-pointer shadow-sm">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <div className="bg-theme-hover p-6 rounded-full mb-6 group-hover:scale-110 group-hover:bg-theme-accent/20 transition-all duration-300"><Upload className="text-theme-muted group-hover:text-theme-accent" size={48} /></div>
+                  <p className="mb-2 text-2xl font-bold text-theme-primary">Drop your notes here</p>
+                  <p className="text-theme-muted">PDF, Text, or Markdown (Max 15MB)</p>
+                </div>
+                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md" />
+              </label>
+            </div>
+
+            {savedUploads.length > 0 && (
+              <div className="mt-10 bg-theme-card rounded-2xl border border-theme-primary p-6 text-left shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <History size={18} className="text-theme-accent" />
+                  <h3 className="text-sm font-bold text-theme-secondary uppercase tracking-widest">Previous Uploads</h3>
+                  <span className="text-[10px] font-bold text-theme-muted bg-theme-hover px-2 py-0.5 rounded-full">{savedUploads.length}</span>
+                </div>
+                <div className="divide-y divide-theme-primary">
+                  {savedUploads.slice(0, 6).map((upload) => (
+                    <div key={upload.id} className="py-3 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-theme-primary text-sm">{upload.title}</p>
+                        <p className="text-xs text-theme-muted">
+                          {upload.fileName} • {upload.domain} • {new Date(upload.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleOpenUpload(upload)}
+                        className="px-4 py-2 bg-theme-accent text-white rounded-xl text-xs font-bold hover:brightness-110 transition-all"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {quizSessions.length > 0 && (
+              <div className="mt-10 bg-theme-card rounded-2xl border border-theme-primary overflow-hidden shadow-sm text-left">
+                <div className="p-6 border-b border-theme-primary flex items-center gap-2">
+                  <History size={18} className="text-theme-accent" />
+                  <h3 className="text-sm font-bold text-theme-secondary uppercase tracking-widest">Past Quiz Sessions</h3>
+                  <span className="text-[10px] font-bold text-theme-muted bg-theme-hover px-2 py-0.5 rounded-full">{quizSessions.length}</span>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                  <SessionList
+                    sessions={quizSessions}
+                    savedUploads={savedUploads}
+                    onReattempt={handleReattemptSession}
+                    onOpenUpload={handleOpenUpload}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="mt-16 flex items-center justify-center gap-12">
+              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-theme-accent mb-1">{stats.streakDays}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Day Streak</div></div>
+              <div className="w-px h-12 bg-theme-primary"></div>
+              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Documents</div></div>
+              <div className="w-px h-12 bg-theme-primary"></div>
+              <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Practice Sets</div></div>
+            </div>
           </div>
         )}
 
-        <header className="bg-theme-secondary border-b border-theme-primary sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setState(AppState.IDLE); setViewMode('summary'); }}>
-              <div className="bg-theme-accent p-2.5 rounded-2xl shadow-lg shadow-theme-accent"><BrainCircuit className="text-white" size={28} /></div>
-              <div>
-                <h1 className="text-2xl font-extrabold tracking-tight text-theme-primary">StudyGenius<span className="text-theme-accent">AI</span></h1>
-                <p className="text-[10px] text-theme-muted font-bold uppercase tracking-widest">Hi, {user?.username || 'Learner'}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-theme-accent-bg text-theme-accent rounded-full text-[10px] font-black uppercase tracking-tighter">
-                <Zap size={14} fill="currentColor" /> Flash Engine Active
-              </div>
-              {state !== AppState.IDLE && (
-                <button
-                  onClick={() => setState(AppState.IDLE)}
-                  className="p-2.5 rounded-2xl bg-theme-secondary text-theme-muted border border-theme-primary hover:bg-theme-hover hover:text-theme-accent transition-all shadow-sm"
-                  title="Back to Dashboard"
-                >
-                  <Home size={20} />
-                </button>
-              )}
-              {state === AppState.VIEWING && (
-                <div className="hidden md:flex bg-theme-hover p-1.5 rounded-2xl gap-1">
-                  {[
-                    { id: 'summary', label: 'Summary', icon: FileText },
-                    { id: 'flashcards', label: 'Flashcards', icon: Layout },
-                    { id: 'quiz', label: 'Quiz', icon: Sparkles },
-                    { id: 'stats', label: 'Progress', icon: Trophy }
-                  ].map((mode) => (
-                    <button
-                      key={mode.id}
-                      onClick={() => setViewMode(mode.id as ViewMode)}
-                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${viewMode === mode.id ? 'bg-theme-secondary text-theme-accent shadow-sm ring-1 ring-theme-primary' : 'text-theme-muted hover:text-theme-primary hover:bg-theme-secondary/50'
-                        }`}
-                    >
-                      <mode.icon size={18} /> {mode.label}
-                    </button>
-                  ))}
+        {state === AppState.PROCESSING && (
+          <div className="flex flex-col items-center justify-center min-h-[50vh]">
+            <div className="bg-theme-card p-12 rounded-[3rem] shadow-xl shadow-theme-accent/10 flex flex-col items-center border border-theme-primary max-w-md w-full">
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-theme-accent/10 rounded-full animate-ping scale-150"></div>
+                <div className="relative bg-theme-card p-4 rounded-full border-2 border-theme-accent">
+                  <Stethoscope className="text-theme-accent" size={48} />
                 </div>
-              )}
-              <button onClick={() => { if (state !== AppState.VIEWING) setState(AppState.VIEWING); setViewMode('stats'); }} className={`p-2.5 rounded-2xl transition-all ${viewMode === 'stats' ? 'bg-theme-accent/20 text-theme-accent' : 'bg-theme-hover text-theme-muted hover:bg-theme-secondary'}`} title="View Progress & Goals"><Trophy size={24} /></button>
-              <ThemeSwitcher />
-              <button onClick={handleLogout} className="p-2.5 rounded-2xl bg-theme-hover text-theme-muted hover:bg-rose-50 hover:text-rose-500 transition-all" title="Log Out"><LogOut size={24} /></button>
+                <Sparkles className="absolute -top-1 -right-1 text-amber-400 animate-bounce" size={24} />
+              </div>
+              <h2 className="text-2xl font-bold text-theme-primary mb-4 text-center">Optimizing Content</h2>
+              <div className="w-full space-y-4">
+                <div className="h-2 bg-theme-hover rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-theme-accent transition-all duration-[3000ms] ease-linear"
+                    style={{ width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%` }}
+                  />
+                </div>
+                <p className="text-theme-accent text-sm font-bold text-center tracking-wide uppercase transition-all animate-pulse">
+                  {LOADING_STEPS[loadingStep]}
+                </p>
+                <div className="flex justify-between items-center px-4 pt-2">
+                  <span className="text-[10px] font-bold text-theme-muted uppercase tracking-widest">Volume Parsed</span>
+                  <span className="text-[10px] font-bold text-theme-accent">{processedChars > 0 ? `${(processedChars / 1024).toFixed(1)} KB` : 'Initializing...'}</span>
+                </div>
+                <p className="text-theme-muted text-center text-xs px-8 leading-relaxed">
+                  Parsing high-volume clinical data. Large files are safely truncated to ensure maximum AI stability.
+                </p>
+              </div>
             </div>
           </div>
-        </header>
+        )}
 
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24">
-          {state === AppState.IDLE && (
-            <div className="max-w-3xl mx-auto text-center animate-fade-in">
-              <div className="mb-12">
-                <h2 className="text-5xl font-extrabold text-theme-primary mb-6 leading-tight">Crush your rotations, <span className="text-transparent bg-clip-text bg-gradient-to-r from-theme-accent to-violet-600">{user?.username}</span></h2>
-                <p className="text-xl text-theme-muted max-w-xl mx-auto leading-relaxed">Upload study materials and generate smart study content tailored to your field.</p>
-              </div>
-
-              {/* Domain Selector */}
-              <div className="mb-8 bg-theme-card rounded-2xl border border-theme-primary p-6 shadow-sm">
-                <label className="block text-sm font-bold text-theme-secondary mb-4">What are you studying for?</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {(['PA', 'Nursing', 'Medical', 'GenEd'] as const).map((domain) => (
-                    <button
-                      key={domain}
-                      onClick={() => setSelectedDomain(domain)}
-                      className={`py-3 px-4 rounded-xl font-bold transition-all ${selectedDomain === domain
-                        ? 'bg-theme-accent text-white shadow-lg'
-                        : 'bg-theme-hover text-theme-secondary hover:bg-theme-secondary/20'
-                        }`}
-                    >
-                      {domain === 'PA' && 'PA (PANCE)'}
-                      {domain === 'Nursing' && 'Nursing (NCLEX)'}
-                      {domain === 'Medical' && 'Medical (USMLE)'}
-                      {domain === 'GenEd' && 'General'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="relative group">
-                <label className="flex flex-col items-center justify-center w-full h-80 border-2 border-dashed border-theme-primary rounded-[3rem] bg-theme-card hover:bg-theme-hover hover:border-theme-accent transition-all cursor-pointer shadow-sm">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <div className="bg-theme-hover p-6 rounded-full mb-6 group-hover:scale-110 group-hover:bg-theme-accent/20 transition-all duration-300"><Upload className="text-theme-muted group-hover:text-theme-accent" size={48} /></div>
-                    <p className="mb-2 text-2xl font-bold text-theme-primary">Drop your notes here</p>
-                    <p className="text-theme-muted">PDF, Text, or Markdown (Max 15MB)</p>
-                  </div>
-                  <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.pdf,.md" />
-                </label>
-              </div>
-
-              {savedUploads.length > 0 && (
-                <div className="mt-10 bg-theme-card rounded-2xl border border-theme-primary p-6 text-left shadow-sm">
-                  <div className="flex items-center gap-2 mb-4">
-                    <History size={18} className="text-theme-accent" />
-                    <h3 className="text-sm font-bold text-theme-secondary uppercase tracking-widest">Previous Uploads</h3>
-                    <span className="text-[10px] font-bold text-theme-muted bg-theme-hover px-2 py-0.5 rounded-full">{savedUploads.length}</span>
-                  </div>
-                  <div className="divide-y divide-theme-primary">
-                    {savedUploads.slice(0, 6).map((upload) => (
-                      <div key={upload.id} className="py-3 flex items-center justify-between gap-4">
-                        <div>
-                          <p className="font-semibold text-theme-primary text-sm">{upload.title}</p>
-                          <p className="text-xs text-theme-muted">
-                            {upload.fileName} • {upload.domain} • {new Date(upload.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleOpenUpload(upload)}
-                          className="px-4 py-2 bg-theme-accent text-white rounded-xl text-xs font-bold hover:brightness-110 transition-all"
-                        >
-                          Open
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {quizSessions.length > 0 && (
-                <div className="mt-10 bg-theme-card rounded-2xl border border-theme-primary overflow-hidden shadow-sm text-left">
-                  <div className="p-6 border-b border-theme-primary flex items-center gap-2">
-                    <History size={18} className="text-theme-accent" />
-                    <h3 className="text-sm font-bold text-theme-secondary uppercase tracking-widest">Past Quiz Sessions</h3>
-                    <span className="text-[10px] font-bold text-theme-muted bg-theme-hover px-2 py-0.5 rounded-full">{quizSessions.length}</span>
-                  </div>
-                  <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                    <SessionList
-                      sessions={quizSessions}
-                      savedUploads={savedUploads}
-                      onReattempt={handleReattemptSession}
-                      onOpenUpload={handleOpenUpload}
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="mt-16 flex items-center justify-center gap-12">
-                <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-theme-accent mb-1">{stats.streakDays}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Day Streak</div></div>
-                <div className="w-px h-12 bg-theme-primary"></div>
-                <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-violet-600 mb-1">{stats.totalUploads}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Documents</div></div>
-                <div className="w-px h-12 bg-theme-primary"></div>
-                <div className="flex flex-col items-center"><div className="text-4xl font-extrabold text-emerald-600 mb-1">{stats.totalQuizzesCompleted}</div><div className="text-theme-muted font-bold uppercase tracking-widest text-xs">Practice Sets</div></div>
-              </div>
-            </div>
-          )}
-
-          {state === AppState.PROCESSING && (
-            <div className="flex flex-col items-center justify-center min-h-[50vh]">
-              <div className="bg-theme-card p-12 rounded-[3rem] shadow-xl shadow-theme-accent/10 flex flex-col items-center border border-theme-primary max-w-md w-full">
-                <div className="relative mb-8">
-                  <div className="absolute inset-0 bg-theme-accent/10 rounded-full animate-ping scale-150"></div>
-                  <div className="relative bg-theme-card p-4 rounded-full border-2 border-theme-accent">
-                    <Stethoscope className="text-theme-accent" size={48} />
-                  </div>
-                  <Sparkles className="absolute -top-1 -right-1 text-amber-400 animate-bounce" size={24} />
-                </div>
-                <h2 className="text-2xl font-bold text-theme-primary mb-4 text-center">Optimizing Content</h2>
-                <div className="w-full space-y-4">
-                  <div className="h-2 bg-theme-hover rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-theme-accent transition-all duration-[3000ms] ease-linear"
-                      style={{ width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-theme-accent text-sm font-bold text-center tracking-wide uppercase transition-all animate-pulse">
-                    {LOADING_STEPS[loadingStep]}
-                  </p>
-                  <div className="flex justify-between items-center px-4 pt-2">
-                    <span className="text-[10px] font-bold text-theme-muted uppercase tracking-widest">Volume Parsed</span>
-                    <span className="text-[10px] font-bold text-theme-accent">{processedChars > 0 ? `${(processedChars / 1024).toFixed(1)} KB` : 'Initializing...'}</span>
-                  </div>
-                  <p className="text-theme-muted text-center text-xs px-8 leading-relaxed">
-                    Parsing high-volume clinical data. Large files are safely truncated to ensure maximum AI stability.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {state === AppState.ERROR && (
-            <div className="max-w-xl mx-auto bg-rose-50 border border-rose-100 p-10 rounded-[2rem] text-center">
-              <div className="bg-rose-100 text-rose-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><AlertCircle size={32} /></div>
-              <h2 className="text-2xl font-bold text-rose-800 mb-4">Upload Error</h2>
-              <p className="text-rose-600 mb-8">{errorMessage}</p>
-              <button onClick={() => setState(AppState.IDLE)} className="px-10 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-colors">Return to Home</button>
-            </div>
-          )}
-
-          {state === AppState.VIEWING && <div className="animate-fade-in"><div className="mb-8">{renderContent()}</div></div>}
-        </main>
-
-        <footer className="bg-transparent py-8 mt-auto border-t border-theme-primary/50">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-theme-muted text-xs font-medium flex items-center gap-1.5">
-                Support this project with a <Heart size={12} className="text-theme-accent fill-theme-accent" />
-              </p>
-              <div className="bg-theme-card/50 border border-theme-primary px-4 py-1.5 rounded-full flex items-center gap-3">
-                <span className="text-[10px] font-bold text-theme-accent uppercase tracking-widest">Zelle</span>
-                <span className="text-theme-primary font-bold text-sm">3175310381</span>
-              </div>
-              <p className="text-[10px] text-theme-muted uppercase tracking-widest mt-2">StudyGenius AI © 2024</p>
-            </div>
+        {state === AppState.ERROR && (
+          <div className="max-w-xl mx-auto bg-rose-50 border border-rose-100 p-10 rounded-[2rem] text-center">
+            <div className="bg-rose-100 text-rose-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><AlertCircle size={32} /></div>
+            <h2 className="text-2xl font-bold text-rose-800 mb-4">Upload Error</h2>
+            <p className="text-rose-600 mb-8">{errorMessage}</p>
+            <button onClick={() => setState(AppState.IDLE)} className="px-10 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-colors">Return to Home</button>
           </div>
-        </footer>
-      </div>
+        )}
+
+        {state === AppState.VIEWING && <div className="animate-fade-in"><div className="mb-8">{renderContent()}</div></div>}
+      </main>
+
+      <footer className="bg-transparent py-8 mt-auto border-t border-theme-primary/50">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-theme-muted text-xs font-medium flex items-center gap-1.5">
+              Support this project with a <Heart size={12} className="text-theme-accent fill-theme-accent" />
+            </p>
+            <div className="bg-theme-card/50 border border-theme-primary px-4 py-1.5 rounded-full flex items-center gap-3">
+              <span className="text-[10px] font-bold text-theme-accent uppercase tracking-widest">Zelle</span>
+              <span className="text-theme-primary font-bold text-sm">3175310381</span>
+            </div>
+            <p className="text-[10px] text-theme-muted uppercase tracking-widest mt-2">StudyGenius AI © 2024</p>
+          </div>
+        </div>
+      </footer>
+    </div>
     </ThemeProvider>
   );
 };

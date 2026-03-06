@@ -95,7 +95,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
 
   return (
     <div className="flex flex-col items-center space-y-8 py-12 max-w-lg mx-auto min-h-full">
-      <div className="text-theme-muted font-medium text-sm">
+      <div className="text-slate-500 font-medium text-sm">
         Card {currentIndex + 1} of {cards.length}
       </div>
 
@@ -103,7 +103,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
         role="button"
         tabIndex={0}
         aria-label={`Flashcard ${currentIndex + 1} of ${cards.length}. ${isFlipped ? 'Showing answer: ' + currentCard.answer : 'Showing question: ' + currentCard.question}. Press Space or Enter to flip. Use arrow keys to navigate.`}
-        className="relative w-full aspect-[4/3] perspective-1000 cursor-pointer group outline-none focus:ring-4 focus:ring-theme-accent rounded-3xl"
+        className="relative w-full aspect-[4/3] perspective-1000 cursor-pointer group outline-none focus:ring-4 focus:ring-indigo-500 rounded-3xl"
         onClick={() => setIsFlipped(!isFlipped)}
         onKeyDown={(e) => {
           if (e.key === ' ' || e.key === 'Enter') {
@@ -114,20 +114,20 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
       >
         <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
           {/* Front */}
-          <div className="absolute inset-0 bg-theme-card border-2 border-theme-primary rounded-3xl shadow-xl flex items-center justify-center p-8 backface-hidden">
+          <div className="absolute inset-0 bg-white border-2 border-slate-100 rounded-3xl shadow-xl flex items-center justify-center p-8 backface-hidden">
             <div className="text-center">
-              <span className="text-theme-accent font-bold uppercase tracking-wider text-xs mb-4 block">Question</span>
-              <p className="text-2xl font-semibold text-theme-primary">{currentCard.question}</p>
+              <span className="text-indigo-500 font-bold uppercase tracking-wider text-xs mb-4 block">Question</span>
+              <p className="text-2xl font-semibold text-slate-800">{currentCard.question}</p>
             </div>
-            <div className="absolute bottom-6 text-theme-tertiary text-sm flex items-center gap-2">
+            <div className="absolute bottom-6 text-slate-400 text-sm flex items-center gap-2">
               <RotateCcw size={16} /> Tap to reveal answer
             </div>
           </div>
 
           {/* Back */}
-          <div className="absolute inset-0 bg-theme-accent border-2 border-theme-accent rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
+          <div className="absolute inset-0 bg-indigo-600 border-2 border-indigo-500 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
             <div className="text-center mb-6">
-              <span className="text-theme-accent-secondary font-bold uppercase tracking-wider text-xs mb-4 block">Answer</span>
+              <span className="text-indigo-200 font-bold uppercase tracking-wider text-xs mb-4 block">Answer</span>
               <p className="text-2xl font-medium text-white">{currentCard.answer}</p>
             </div>
             {isFlipped && (
@@ -174,13 +174,13 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
       <div className="flex items-center gap-6">
         <button 
           onClick={prevCard}
-          className="p-4 rounded-full bg-theme-card border border-theme-secondary text-theme-secondary hover:bg-theme-hover transition-colors shadow-sm"
+          className="p-4 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
         >
           <ChevronLeft size={24} />
         </button>
         <button 
           onClick={nextCard}
-          className="p-4 rounded-full bg-theme-card border border-theme-secondary text-theme-secondary hover:bg-theme-hover transition-colors shadow-sm"
+          className="p-4 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
         >
           <ChevronRight size={24} />
         </button>
@@ -189,7 +189,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
       <button
         onClick={loadMore}
         disabled={isLoadingMore}
-        className="mt-4 px-6 py-3 bg-theme-accent hover:bg-theme-accent-secondary disabled:bg-theme-accent-secondary disabled:cursor-wait text-white rounded-lg font-medium transition-colors flex items-center gap-2 min-w-[220px] justify-center"
+        className="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-wait text-white rounded-lg font-medium transition-colors flex items-center gap-2 min-w-[220px] justify-center"
       >
         {isLoadingMore ? (
           <MiniLoader text="Generating" />
@@ -202,8 +202,8 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ cards, topic, onCa
       </button>
       
       {isLoadingMore && (
-        <div className="w-48 h-1.5 bg-theme-secondary rounded-full overflow-hidden mt-2">
-          <div className="h-full bg-gradient-to-r from-theme-accent to-theme-accent-secondary rounded-full animate-progress-indeterminate"></div>
+        <div className="w-48 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-2">
+          <div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full animate-progress-indeterminate"></div>
         </div>
       )}
     </div>

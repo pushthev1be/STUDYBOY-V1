@@ -150,30 +150,30 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
   if (isSubmitted) {
     return (
-      <div className="max-w-4xl mx-auto bg-theme-card rounded-3xl shadow-xl border border-theme-primary overflow-hidden animate-fade-in mb-20">
-        <div className="bg-theme-accent p-12 text-center text-white">
+      <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden animate-fade-in mb-20">
+        <div className="bg-indigo-600 p-12 text-center text-white">
           <Award className="mx-auto mb-6 opacity-80" size={64} />
           <h2 className="text-4xl font-bold mb-2">Round Complete</h2>
-          <p className="text-theme-accent-secondary text-lg">PANCE prep takes persistence.</p>
+          <p className="text-indigo-100 text-lg">PANCE prep takes persistence.</p>
         </div>
         <div className="p-12">
           <div className="grid grid-cols-3 gap-8 mb-12">
-            <div className="text-center p-6 bg-theme-hover rounded-2xl">
-              <div className="text-3xl font-bold text-theme-primary">{stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0}%</div>
-              <div className="text-sm text-theme-muted font-medium">Diagnostic Score</div>
+            <div className="text-center p-6 bg-slate-50 rounded-2xl">
+              <div className="text-3xl font-bold text-slate-800">{stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0}%</div>
+              <div className="text-sm text-slate-500 font-medium">Diagnostic Score</div>
             </div>
-            <div className="text-center p-6 bg-theme-hover rounded-2xl">
-              <div className="text-3xl font-bold text-theme-primary">{stats.correct}/{stats.total}</div>
-              <div className="text-sm text-theme-muted font-medium">Cases Correct</div>
+            <div className="text-center p-6 bg-slate-50 rounded-2xl">
+              <div className="text-3xl font-bold text-slate-800">{stats.correct}/{stats.total}</div>
+              <div className="text-sm text-slate-500 font-medium">Cases Correct</div>
             </div>
-            <div className="text-center p-6 bg-theme-hover rounded-2xl">
-              <div className="text-3xl font-bold text-theme-primary">{stats.flagged}</div>
-              <div className="text-sm text-theme-muted font-medium">Review Later</div>
+            <div className="text-center p-6 bg-slate-50 rounded-2xl">
+              <div className="text-3xl font-bold text-slate-800">{stats.flagged}</div>
+              <div className="text-sm text-slate-500 font-medium">Review Later</div>
             </div>
           </div>
           <button
             onClick={restartSession}
-            className="w-full py-4 bg-theme-accent text-white rounded-xl font-bold hover:bg-theme-accent-secondary transition-all shadow-lg flex items-center justify-center gap-2"
+            className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2"
           >
             <RotateCcw size={20} /> Restart Board Review
           </button>
@@ -184,27 +184,27 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-32">
-      <div className="flex items-center justify-between bg-theme-card/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-theme-secondary sticky top-24 z-30">
+      <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-24 z-30">
         <div className="flex items-center gap-4">
-          <div className="bg-theme-accent-bg p-3 rounded-xl">
-            <Stethoscope className="text-theme-accent" size={24} />
+          <div className="bg-indigo-50 p-3 rounded-xl">
+            <Stethoscope className="text-indigo-600" size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-theme-primary">Clinical Vignettes</h2>
-            <p className="text-sm text-theme-muted">Board-style practice questions</p>
+            <h2 className="text-xl font-bold text-slate-800">Clinical Vignettes</h2>
+            <p className="text-sm text-slate-500">Board-style practice questions</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block mr-2">
-            <div className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest">Questions Found</div>
-            <div className="text-sm font-bold text-theme-accent">{stats.answered} / {stats.total}</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Questions Found</div>
+            <div className="text-sm font-bold text-indigo-600">{stats.answered} / {stats.total}</div>
           </div>
 
           {onKeepGoing && (
             <button
               onClick={onKeepGoing}
               disabled={isExtending}
-              className="flex items-center gap-2 px-4 py-2.5 bg-theme-card text-theme-accent border border-theme-accent rounded-xl font-bold hover:bg-theme-accent-bg transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold hover:bg-indigo-50 transition-all disabled:opacity-50"
             >
               {isExtending ? <Loader2 size={18} className="animate-spin" /> : <PlusCircle size={18} />}
               Extend Case Study
@@ -214,7 +214,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
           <button
             onClick={finalizeSession}
             disabled={stats.answered === 0}
-            className="px-6 py-2.5 bg-theme-accent text-white rounded-xl font-bold hover:bg-theme-accent-secondary transition-all disabled:opacity-50 shadow-lg"
+            className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 shadow-lg"
           >
             Submit All
           </button>
@@ -222,17 +222,17 @@ export const QuizView: React.FC<QuizViewProps> = ({
       </div>
 
       {pastSessions.length > 0 && (
-        <div className="bg-theme-card rounded-2xl border border-theme-secondary overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <button
             onClick={() => setShowHistory(!showHistory)}
-            className="w-full flex items-center justify-between p-5 hover:bg-theme-hover transition-all"
+            className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all"
           >
             <div className="flex items-center gap-3">
-              <History className="text-theme-accent" size={20} />
-              <span className="font-bold text-theme-secondary">Past Quiz Sessions</span>
-              <span className="text-xs font-bold text-theme-tertiary bg-theme-tertiary px-2 py-0.5 rounded-full">{pastSessions.length}</span>
+              <History className="text-indigo-500" size={20} />
+              <span className="font-bold text-slate-700">Past Quiz Sessions</span>
+              <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{pastSessions.length}</span>
             </div>
-            {showHistory ? <ChevronUp size={20} className="text-theme-tertiary" /> : <ChevronDown size={20} className="text-theme-tertiary" />}
+            {showHistory ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
           </button>
 
           {showHistory && (
@@ -261,22 +261,22 @@ export const QuizView: React.FC<QuizViewProps> = ({
               <React.Fragment key={qIdx}>
                 {subtopicHeader && (
                   <div className="flex items-center gap-3 pt-4">
-                    <div className="h-px flex-1 bg-theme-accent-secondary"></div>
-                    <span className="text-xs font-black text-theme-accent uppercase tracking-widest bg-theme-accent-bg px-4 py-1.5 rounded-full">{q.subtopic}</span>
-                    <div className="h-px flex-1 bg-theme-accent-secondary"></div>
+                    <div className="h-px flex-1 bg-indigo-100"></div>
+                    <span className="text-xs font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-4 py-1.5 rounded-full">{q.subtopic}</span>
+                    <div className="h-px flex-1 bg-indigo-100"></div>
                   </div>
                 )}
-                <div className={`bg-theme-card rounded-3xl border transition-all p-8 relative ${status.isAnswered ? 'border-theme-primary shadow-sm' : 'border-theme-secondary shadow-md'}`}>
+                <div className={`bg-white rounded-3xl border transition-all p-8 relative ${status.isAnswered ? 'border-slate-100 shadow-sm' : 'border-slate-200 shadow-md'}`}>
                   <div className="flex items-start justify-between mb-6">
                     <div className="flex items-center gap-4">
-                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${status.isAnswered ? 'bg-theme-accent-secondary text-theme-accent' : 'bg-theme-tertiary text-theme-tertiary'}`}>
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${status.isAnswered ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
                         {qIdx + 1}
                       </span>
-                      <h3 className="text-lg font-bold text-theme-primary leading-relaxed whitespace-pre-wrap">{q.question}</h3>
+                      <h3 className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{q.question}</h3>
                     </div>
                     <button
                       onClick={() => toggleFlag(qIdx)}
-                      className={`p-2 rounded-lg transition-all ${status.isFlagged ? 'bg-amber-100 text-amber-600' : 'text-theme-tertiary hover:text-theme-muted'}`}
+                      className={`p-2 rounded-lg transition-all ${status.isFlagged ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}
                     >
                       <Flag size={20} fill={status.isFlagged ? "currentColor" : "none"} />
                     </button>
@@ -288,12 +288,12 @@ export const QuizView: React.FC<QuizViewProps> = ({
                       const isCorrect = oIdx === q.correctAnswer;
                       const showFeedback = status.isAnswered;
 
-                      let style = "border-theme-secondary hover:border-theme-accent hover:bg-theme-hover";
-                      if (isSelected) style = "border-theme-accent bg-theme-accent-bg/50 ring-2 ring-theme-accent";
+                      let style = "border-slate-200 hover:border-indigo-200 hover:bg-slate-50";
+                      if (isSelected) style = "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-100";
                       if (showFeedback) {
                         if (isCorrect) style = "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100";
                         else if (isSelected) style = "border-rose-500 bg-rose-50 ring-2 ring-rose-100";
-                        else style = "border-theme-primary opacity-50";
+                        else style = "border-slate-100 opacity-50";
                       }
 
                       return (
@@ -303,10 +303,10 @@ export const QuizView: React.FC<QuizViewProps> = ({
                           onClick={() => handleOptionSelect(qIdx, oIdx)}
                           className={`p-5 rounded-2xl border-2 text-left transition-all flex items-center gap-4 group ${style}`}
                         >
-                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-theme-accent border-theme-accent' : 'border-theme-secondary'}`}>
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
                             {isSelected && <Check size={14} className="text-white" />}
                           </div>
-                          <span className={`text-base font-medium ${isSelected ? 'text-theme-primary' : 'text-theme-secondary'}`}>
+                          <span className={`text-base font-medium ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
                             {option}
                           </span>
                         </button>
@@ -315,22 +315,22 @@ export const QuizView: React.FC<QuizViewProps> = ({
                   </div>
 
                   {status.showExplanation && (
-                    <div className="mt-8 p-6 bg-theme-hover rounded-2xl border border-theme-primary animate-slide-up">
+                    <div className="mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 animate-slide-up">
                       <div className="flex gap-4 mb-4">
                         <div className={`p-2 rounded-lg h-fit ${status.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
                           {status.isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                         </div>
                         <div>
-                          <h4 className="font-bold text-theme-primary mb-1">
+                          <h4 className="font-bold text-slate-800 mb-1">
                             {status.isCorrect ? 'Correct!' : `The correct answer is "${q.options[q.correctAnswer]}".`}
                           </h4>
-                          <p className="text-theme-secondary text-sm leading-relaxed">{q.explanation}</p>
+                          <p className="text-slate-600 text-sm leading-relaxed">{q.explanation}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-theme-secondary">
-                        <Sparkles className="text-theme-accent" size={16} />
-                        <span className="text-[10px] font-bold text-theme-accent uppercase tracking-widest">Clinical Pearl</span>
+                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200">
+                        <Sparkles className="text-indigo-500" size={16} />
+                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Clinical Pearl</span>
                       </div>
                     </div>
                   )}
@@ -341,12 +341,12 @@ export const QuizView: React.FC<QuizViewProps> = ({
         })()}
 
         {isExtending && (
-          <div className="bg-theme-card rounded-3xl border-2 border-dashed border-theme-secondary p-12 flex flex-col items-center justify-center text-center">
-            <Loader2 className="text-theme-accent animate-spin mb-4" size={40} />
-            <p className="text-theme-secondary font-semibold mb-2">Generating more clinical cases...</p>
-            <p className="text-theme-tertiary text-sm mb-4">Creating challenging board-style questions</p>
-            <div className="w-48 h-2 bg-theme-tertiary rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-theme-accent to-theme-accent-secondary rounded-full animate-progress-indeterminate"></div>
+          <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 flex flex-col items-center justify-center text-center">
+            <Loader2 className="text-indigo-500 animate-spin mb-4" size={40} />
+            <p className="text-slate-600 font-semibold mb-2">Generating more clinical cases...</p>
+            <p className="text-slate-400 text-sm mb-4">Creating challenging board-style questions</p>
+            <div className="w-48 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full animate-progress-indeterminate"></div>
             </div>
           </div>
         )}
@@ -356,7 +356,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
         <button
           onClick={onKeepGoing}
           disabled={isExtending}
-          className="px-8 py-5 bg-theme-card text-theme-accent border-2 border-theme-accent rounded-2xl font-bold text-lg hover:bg-theme-accent-bg disabled:bg-theme-hover disabled:text-theme-accent-secondary disabled:cursor-wait transition-all flex items-center justify-center gap-2 min-w-[240px]"
+          className="px-8 py-5 bg-white text-indigo-600 border-2 border-indigo-100 rounded-2xl font-bold text-lg hover:bg-indigo-50 disabled:bg-slate-50 disabled:text-indigo-400 disabled:cursor-wait transition-all flex items-center justify-center gap-2 min-w-[240px]"
         >
           {isExtending ? (
             <>
@@ -372,7 +372,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
         </button>
         <button
           onClick={finalizeSession}
-          className="px-12 py-5 bg-theme-accent text-white rounded-2xl font-bold text-lg hover:bg-theme-accent-secondary transition-all shadow-xl shadow-theme-accent"
+          className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
         >
           Finish Board Review
         </button>
