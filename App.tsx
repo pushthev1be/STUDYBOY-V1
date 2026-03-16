@@ -69,14 +69,47 @@ const calculateNextReview = (quality: number, interval: number = 0, easeFactor: 
   };
 };
 
-const LOADING_STEPS = [
-  "Extracting text from document...",
-  "Identifying clinical indicators...",
-  "Synthesizing PANCE-style vignettes...",
-  "Drafting diagnostic-choice questions...",
-  "Refining medical explanations...",
-  "Ready for Board Review!"
-];
+const DOMAIN_LOADING_STEPS: Record<StudyDomain, string[]> = {
+  PA: [
+    "Extracting text from document...",
+    "Identifying clinical indicators...",
+    "Synthesizing PANCE-style vignettes...",
+    "Drafting diagnostic-choice questions...",
+    "Refining medical explanations...",
+    "Ready for Board Review!"
+  ],
+  Nursing: [
+    "Extracting text from document...",
+    "Identifying patient-care priorities...",
+    "Building NCLEX-style scenarios...",
+    "Drafting clinical judgment questions...",
+    "Refining nursing rationales...",
+    "Ready for Practice Review!"
+  ],
+  Medical: [
+    "Extracting text from document...",
+    "Identifying key mechanisms...",
+    "Linking concepts to patient scenarios...",
+    "Drafting application questions...",
+    "Refining explanations...",
+    "Ready for Review!"
+  ],
+  GenEd: [
+    "Extracting text from document...",
+    "Identifying core concepts...",
+    "Connecting ideas and examples...",
+    "Drafting application questions...",
+    "Refining explanations...",
+    "Ready for Practice!"
+  ]
+};
+
+const PROCESSING_DESCRIPTIONS: Record<StudyDomain, string> = {
+  PA: 'Parsing high-volume clinical data. Large files are safely truncated to ensure maximum AI stability.',
+  Nursing: 'Parsing detailed study content. Large files are safely truncated to ensure maximum AI stability.',
+  Medical: 'Parsing detailed study content. Large files are safely truncated to ensure maximum AI stability.',
+  GenEd: 'Parsing detailed study content. Large files are safely truncated to ensure maximum AI stability.'
+};
 
 const MAX_CHAR_COUNT = 100000; // ~25,000 tokens, plenty for study notes
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
@@ -101,16 +134,17 @@ const App: React.FC = () => {
   const [savedUploads, setSavedUploads] = useState<SavedUpload[]>([]);
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
   const [quizResetKey, setQuizResetKey] = useState<string>('');
+  const loadingSteps = DOMAIN_LOADING_STEPS[selectedDomain];
 
   useEffect(() => {
     let interval: number;
     if (state === AppState.PROCESSING) {
       interval = window.setInterval(() => {
-        setLoadingStep(prev => (prev < LOADING_STEPS.length - 1 ? prev + 1 : prev));
+        setLoadingStep(prev => (prev < loadingSteps.length - 1 ? prev + 1 : prev));
       }, 3000);
     }
     return () => clearInterval(interval);
-  }, [state]);
+  }, [state, loadingSteps.length]);
 
   useEffect(() => {
     // Check Supabase session first, then fall back to localStorage
@@ -366,7 +400,7 @@ const App: React.FC = () => {
     if (material.unprocessedContent) {
       setIsExtending(true);
       try {
-        const newMaterial = await processStudyContent(material.unprocessedContent, false);
+        const newMaterial = await processStudyContent(material.unprocessedContent, false, selectedDomain);
         setMaterial({
           ...material,
           summary: material.summary + '\n\n[Continued from remaining content]\n' + newMaterial.summary,
@@ -387,7 +421,7 @@ const App: React.FC = () => {
       // Fallback: generate more questions from existing material
       setIsExtending(true);
       try {
-        const newQuestions = await extendQuiz(material.title, material.quiz.length);
+        const newQuestions = await extendQuiz(material.title, material.quiz.length, selectedDomain);
         if (newQuestions.length > 0) {
           setMaterial({
             ...material,
@@ -409,7 +443,7 @@ const App: React.FC = () => {
 
     setIsExtending(true);
     try {
-      const newQuestions = await generateQuestionForFailure(material.title);
+      const newQuestions = await generateQuestionForFailure(material.title, selectedDomain);
       if (newQuestions.length > 0) {
         setMaterial({
           ...material,
@@ -564,6 +598,7 @@ const App: React.FC = () => {
       />;
       case 'quiz': return <QuizView
         questions={Array.isArray(material.quiz) ? material.quiz : []}
+        domain={selectedDomain}
         onQuizComplete={(score, total, questions, questionStates) => {
           updateProgress('quiz', { perfect: score === total });
           const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -784,18 +819,18 @@ const App: React.FC = () => {
                 <div className="h-2 bg-theme-hover rounded-full overflow-hidden">
                   <div
                     className="h-full bg-theme-accent transition-all duration-[3000ms] ease-linear"
-                    style={{ width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%` }}
+                    style={{ width: `${((loadingStep + 1) / loadingSteps.length) * 100}%` }}
                   />
                 </div>
                 <p className="text-theme-accent text-sm font-bold text-center tracking-wide uppercase transition-all animate-pulse">
-                  {LOADING_STEPS[loadingStep]}
+                  {loadingSteps[loadingStep]}
                 </p>
                 <div className="flex justify-between items-center px-4 pt-2">
                   <span className="text-[10px] font-bold text-theme-muted uppercase tracking-widest">Volume Parsed</span>
                   <span className="text-[10px] font-bold text-theme-accent">{processedChars > 0 ? `${(processedChars / 1024).toFixed(1)} KB` : 'Initializing...'}</span>
                 </div>
                 <p className="text-theme-muted text-center text-xs px-8 leading-relaxed">
-                  Parsing high-volume clinical data. Large files are safely truncated to ensure maximum AI stability.
+                  {PROCESSING_DESCRIPTIONS[selectedDomain]}
                 </p>
               </div>
             </div>

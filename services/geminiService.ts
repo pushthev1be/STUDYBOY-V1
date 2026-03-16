@@ -153,6 +153,158 @@ const ADDITIONAL_QUESTIONS_SCHEMA = {
 // Default system instruction (PA focused)
 const DEFAULT_SYSTEM_INSTRUCTION = DOMAIN_INSTRUCTIONS['PA'];
 
+function getQuizSubtopicExamples(domain: StudyDomain): string {
+  switch (domain) {
+    case 'Nursing':
+      return 'Assessment, Priorities, Intervention, Patient Education';
+    case 'Medical':
+      return 'Mechanism, Diagnosis, Management, Interpretation';
+    case 'GenEd':
+      return 'Core Idea, Application, Evidence, Interpretation';
+    case 'PA':
+    default:
+      return 'Pathophysiology, Pharmacology, Diagnosis, Management';
+  }
+}
+
+function getExtendQuizPrompt(currentTopic: string, domain: StudyDomain): string {
+  const subtopics = getQuizSubtopicExamples(domain);
+
+  switch (domain) {
+    case 'Nursing':
+      return `Generate 5 new NCLEX-style practice questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "${subtopics}"). Vary difficulty and care settings. Use realistic patient-care scenarios, plausible distractors, and concise explanations focused on nursing judgment and safety.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+    case 'Medical':
+      return `Generate 5 new medical school practice questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "${subtopics}"). Vary difficulty and reasoning style. Use mechanism-driven patient scenarios where appropriate, plausible distractors, and concise explanations.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+    case 'GenEd':
+      return `Generate 5 new practice questions about "${currentTopic}" for a general education learner. Each must include a "subtopic" field (e.g. "${subtopics}"). Vary difficulty and question format. Favor real-world, everyday, historical, literary, scientific, or conceptual examples that match the topic. Keep the tone accessible and engaging. Do NOT use clinical, diagnostic, board-exam, or patient-case framing unless the topic itself is explicitly about health care.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+    case 'PA':
+    default:
+      return `Generate 5 new board-style questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "${subtopics}"). Vary difficulty and scenarios. Include clinical vignettes, plausible distractors, and concise explanations.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+  }
+}
+
+function getRemediationPrompt(currentTopic: string, domain: StudyDomain): string {
+  const subtopics = getQuizSubtopicExamples(domain);
+
+  switch (domain) {
+    case 'Nursing':
+      return `A student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that revisit the concept from different nursing perspectives. Include a "subtopic" field (e.g. "${subtopics}"), realistic care scenarios, and explanations that clarify the misconception.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+    case 'Medical':
+      return `A student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different mechanistic angles. Include a "subtopic" field (e.g. "${subtopics}"), realistic scenarios where appropriate, and explanations that clarify the misconception.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+    case 'GenEd':
+      return `A student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that revisit the concept from different angles. Include a "subtopic" field (e.g. "${subtopics}") and explanations that clearly address the misconception. Use accessible, non-clinical framing unless the topic itself is explicitly medical or health-related.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+    case 'PA':
+    default:
+      return `Student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different angles. Include a "subtopic" field, clinical vignettes, and explanations that clarify the misconception.
+
+IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+  }
+}
+
+function getFreshQuizPrompt(material: StudyMaterial, domain: StudyDomain): string {
+  const subtopics = getQuizSubtopicExamples(domain);
+
+  switch (domain) {
+    case 'Nursing':
+      return `Generate fresh study materials based on this existing material:
+
+Title: "${material.title}"
+
+Summary: "${material.summary}"
+
+Create entirely new content covering the key concepts. Generate:
+1. 20 new NCLEX-style practice questions with realistic care scenarios
+2. 30 new flashcard pairs covering different aspects
+
+Each quiz question should include:
+- A realistic patient-care scenario or prioritization setup
+- 4 plausible options with common misconceptions as distractors
+- A clear, educational explanation
+- A "subtopic" field for organization (e.g. ${subtopics})
+
+IMPORTANT: The "correctAnswer" field for quiz questions MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.
+
+Return as JSON with "quiz" array and "flashcards" array.`;
+    case 'Medical':
+      return `Generate fresh study materials based on this existing material:
+
+Title: "${material.title}"
+
+Summary: "${material.summary}"
+
+Create entirely new content covering the key concepts. Generate:
+1. 20 new medical school practice questions
+2. 30 new flashcard pairs covering different aspects
+
+Each quiz question should include:
+- A mechanism-focused prompt or realistic scenario when helpful
+- 4 plausible options with common misconceptions as distractors
+- A clear, educational explanation
+- A "subtopic" field for organization (e.g. ${subtopics})
+
+IMPORTANT: The "correctAnswer" field for quiz questions MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.
+
+Return as JSON with "quiz" array and "flashcards" array.`;
+    case 'GenEd':
+      return `Generate fresh study materials based on this existing material:
+
+Title: "${material.title}"
+
+Summary: "${material.summary}"
+
+Create entirely new content covering the key concepts. Generate:
+1. 20 new engaging practice questions for a general education learner
+2. 30 new flashcard pairs covering different aspects
+
+Each quiz question should include:
+- A clear conceptual or real-world setup that fits the topic
+- 4 plausible options with common misconceptions as distractors
+- A clear, educational explanation
+- A "subtopic" field for organization (e.g. ${subtopics})
+
+Do NOT use clinical, diagnostic, board-exam, or patient-case framing unless the topic itself is explicitly about health care.
+
+IMPORTANT: The "correctAnswer" field for quiz questions MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.
+
+Return as JSON with "quiz" array and "flashcards" array.`;
+    case 'PA':
+    default:
+      return `Generate fresh study materials based on this existing material:
+
+Title: "${material.title}"
+
+Summary: "${material.summary}"
+
+Create entirely new content (different from any seen before) covering the key concepts. Generate:
+1. 20 new, challenging board-style quiz questions with clinical scenarios
+2. 30 new flashcard pairs covering different aspects
+
+Each quiz question should include:
+- A realistic clinical vignette or scenario
+- 4 plausible options with common misconceptions as distractors
+- A clear, educational explanation
+- A "subtopic" field for organization (e.g. ${subtopics})
+
+IMPORTANT: The "correctAnswer" field for quiz questions MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.
+
+Return as JSON with "quiz" array and "flashcards" array.`;
+  }
+}
+
 // Helper to fix truncated JSON responses
 function fixTruncatedJson(text: string): string {
   let fixed = text.trim();
@@ -297,7 +449,7 @@ Test Yourself:
 Common Misconception:
 [misconception text]
 
-Also generate 10 quiz questions (each with a "subtopic" field like "Pathophysiology") and 30 flashcard pairs.
+Also generate 20 quiz questions (each with a "subtopic" field like "Pathophysiology") and 30 flashcard pairs.
 
 IMPORTANT FOR QUIZ QUESTIONS: The "correctAnswer" field MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`
     : `Analyze these notes and generate a structured study guide. Format the summary with NEWLINES between each section and between each item:
@@ -325,7 +477,7 @@ Common Misconception:
 NOTES:
 ${content}
 
-Generate 10 quiz questions (each with a "subtopic" field like "Pathophysiology", "Pharmacology", "Diagnosis") and 30 flashcard pairs.
+Generate 20 quiz questions (each with a "subtopic" field like "Pathophysiology", "Pharmacology", "Diagnosis") and 30 flashcard pairs.
 
 IMPORTANT FOR QUIZ QUESTIONS: The "correctAnswer" field MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
 
@@ -366,13 +518,10 @@ IMPORTANT FOR QUIZ QUESTIONS: The "correctAnswer" field MUST be a 0-based intege
   }
 }
 
-export async function extendQuiz(currentTopic: string, existingCount: number): Promise<QuizQuestion[]> {
+export async function extendQuiz(currentTopic: string, existingCount: number, domain: StudyDomain = 'PA'): Promise<QuizQuestion[]> {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 || '' });
   const model = 'gemini-2.5-flash';
-
-  const prompt = `Generate 5 new board-style questions about "${currentTopic}". Each must include a "subtopic" field (e.g. "Pathophysiology", "Pharmacology"). Vary difficulty and scenarios. Include clinical vignettes, plausible distractors, and concise explanations.
-
-IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+  const prompt = getExtendQuizPrompt(currentTopic, domain);
 
   try {
     return await retryWithBackoff(async () => {
@@ -380,7 +529,7 @@ IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0
         model,
         contents: [{ parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          systemInstruction: DOMAIN_INSTRUCTIONS[domain],
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
           maxOutputTokens: 8000
@@ -396,13 +545,10 @@ IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0
   }
 }
 
-export async function generateQuestionForFailure(currentTopic: string): Promise<QuizQuestion[]> {
+export async function generateQuestionForFailure(currentTopic: string, domain: StudyDomain = 'PA'): Promise<QuizQuestion[]> {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 || '' });
   const model = 'gemini-2.5-flash';
-
-  const prompt = `Student got a question wrong about "${currentTopic}". Generate 2 targeted remediation questions that approach the concept from different angles. Include a "subtopic" field, clinical vignettes, and explanations that clarify the misconception.
-
-IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.`;
+  const prompt = getRemediationPrompt(currentTopic, domain);
 
   try {
     return await retryWithBackoff(async () => {
@@ -410,7 +556,7 @@ IMPORTANT: For each question, "correctAnswer" MUST be a 0-based integer index (0
         model,
         contents: [{ parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          systemInstruction: DOMAIN_INSTRUCTIONS[domain],
           responseMimeType: "application/json",
           responseSchema: ADDITIONAL_QUESTIONS_SCHEMA,
           maxOutputTokens: 4000
@@ -458,7 +604,8 @@ export async function generateWrongAnswerFeedback(
   selectedAnswer: string,
   correctAnswer: string,
   allOptions: string[],
-  explanation: string
+  explanation: string,
+  domain: StudyDomain = 'PA'
 ): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 || '' });
   const model = 'gemini-2.5-flash';
@@ -487,7 +634,7 @@ Keep it concise (2-3 sentences) and address the specific misconception the stude
         model,
         contents: [{ role: 'user' as const, parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          systemInstruction: DOMAIN_INSTRUCTIONS[domain],
           maxOutputTokens: 500
         },
       });
@@ -505,25 +652,7 @@ export async function generateFreshQuiz(material: StudyMaterial, domain: StudyDo
   const model = 'gemini-2.5-flash';
   const systemInstruction = DOMAIN_INSTRUCTIONS[domain];
 
-  const prompt = `Generate fresh study materials based on this existing material:
-
-Title: "${material.title}"
-
-Summary: "${material.summary}"
-
-Create entirely new content (different from any seen before) covering the key concepts. Generate:
-1. 10 new, challenging board-style quiz questions with clinical scenarios
-2. 30 new flashcard pairs covering different aspects
-
-Each quiz question should include:
-- A realistic clinical vignette or scenario
-- 4 plausible options with common misconceptions as distractors
-- A clear, educational explanation
-- A "subtopic" field for organization (e.g. Pathophysiology, Pharmacology, Diagnosis)
-
-IMPORTANT: The "correctAnswer" field for quiz questions MUST be a 0-based integer index (0, 1, 2, or 3) that corresponds to the position of the correct answer in the "options" array.
-
-Return as JSON with "quiz" array and "flashcards" array.`;
+  const prompt = getFreshQuizPrompt(material, domain);
 
   try {
     return await retryWithBackoff(async () => {

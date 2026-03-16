@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { QuizQuestion, QuestionStatus, QuizSession, SavedUpload } from '../types';
+import { QuizQuestion, QuestionStatus, QuizSession, SavedUpload, StudyDomain } from '../types';
 import {
   CheckCircle2,
   XCircle,
@@ -21,6 +21,7 @@ import { generateWrongAnswerFeedback } from '../services/geminiService';
 
 interface QuizViewProps {
   questions: QuizQuestion[];
+  domain?: StudyDomain;
   onQuizComplete?: (score: number, total: number, questions: QuizQuestion[], questionStates: QuestionStatus[]) => void;
   onKeepGoing?: () => Promise<void>;
   onQuestionFailed?: () => Promise<void>;
@@ -35,6 +36,7 @@ interface QuizViewProps {
 
 export const QuizView: React.FC<QuizViewProps> = ({
   questions,
+  domain = 'PA',
   onQuizComplete,
   onKeepGoing,
   onQuestionFailed,
@@ -51,6 +53,72 @@ export const QuizView: React.FC<QuizViewProps> = ({
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+
+  const quizCopy = useMemo(() => {
+    switch (domain) {
+      case 'Nursing':
+        return {
+          title: 'Clinical Scenarios',
+          subtitle: 'NCLEX-style practice questions',
+          extendAction: 'Extend Practice Set',
+          loadingTitle: 'Generating more practice scenarios...',
+          loadingSubtitle: 'Creating new nursing judgment questions',
+          requestMore: 'Request More Questions',
+          finish: 'Finish Practice Review',
+          restart: 'Restart Practice Review',
+          roundSubtitle: 'Practice judgment improves with repetition.',
+          scoreLabel: 'Score',
+          correctLabel: 'Questions Correct',
+          insightLabel: 'Key Takeaway'
+        };
+      case 'Medical':
+        return {
+          title: 'Clinical Reasoning',
+          subtitle: 'Application-focused medical questions',
+          extendAction: 'Extend Practice Set',
+          loadingTitle: 'Generating more practice questions...',
+          loadingSubtitle: 'Creating new mechanism and application questions',
+          requestMore: 'Request More Questions',
+          finish: 'Finish Review',
+          restart: 'Restart Review',
+          roundSubtitle: 'Strong reasoning comes from repeated retrieval.',
+          scoreLabel: 'Score',
+          correctLabel: 'Questions Correct',
+          insightLabel: 'Key Takeaway'
+        };
+      case 'GenEd':
+        return {
+          title: 'Practice Questions',
+          subtitle: 'Concept and application review',
+          extendAction: 'Load More Questions',
+          loadingTitle: 'Generating more practice questions...',
+          loadingSubtitle: 'Creating new concept checks and applied examples',
+          requestMore: 'Request More Questions',
+          finish: 'Finish Practice',
+          restart: 'Restart Practice',
+          roundSubtitle: 'Keep building understanding one round at a time.',
+          scoreLabel: 'Score',
+          correctLabel: 'Questions Correct',
+          insightLabel: 'Key Takeaway'
+        };
+      case 'PA':
+      default:
+        return {
+          title: 'Clinical Vignettes',
+          subtitle: 'Board-style practice questions',
+          extendAction: 'Extend Case Study',
+          loadingTitle: 'Generating more clinical cases...',
+          loadingSubtitle: 'Creating challenging board-style questions',
+          requestMore: 'Request More Cases',
+          finish: 'Finish Board Review',
+          restart: 'Restart Board Review',
+          roundSubtitle: 'PANCE prep takes persistence.',
+          scoreLabel: 'Diagnostic Score',
+          correctLabel: 'Cases Correct',
+          insightLabel: 'Clinical Pearl'
+        };
+    }
+  }, [domain]);
   
   // Create a stable quiz ID based on the questions to track progress
   const quizId = React.useMemo(() => {
@@ -169,7 +237,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
         selectedAnswer,
         correctAnswer,
         question.options,
-        question.explanation
+        question.explanation,
+        domain
       ).then(feedback => {
         // Update the state with custom explanation
         setSessionStates(prevStates => {
@@ -232,17 +301,17 @@ export const QuizView: React.FC<QuizViewProps> = ({
         <div className="bg-indigo-600 p-12 text-center text-white">
           <Award className="mx-auto mb-6 opacity-80" size={64} />
           <h2 className="text-4xl font-bold mb-2">Round Complete</h2>
-          <p className="text-indigo-100 text-lg">PANCE prep takes persistence.</p>
+          <p className="text-indigo-100 text-lg">{quizCopy.roundSubtitle}</p>
         </div>
         <div className="p-12">
           <div className="grid grid-cols-3 gap-8 mb-12">
             <div className="text-center p-6 bg-slate-50 rounded-2xl">
               <div className="text-3xl font-bold text-slate-800">{stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0}%</div>
-              <div className="text-sm text-slate-500 font-medium">Diagnostic Score</div>
+              <div className="text-sm text-slate-500 font-medium">{quizCopy.scoreLabel}</div>
             </div>
             <div className="text-center p-6 bg-slate-50 rounded-2xl">
               <div className="text-3xl font-bold text-slate-800">{stats.correct}/{stats.total}</div>
-              <div className="text-sm text-slate-500 font-medium">Cases Correct</div>
+              <div className="text-sm text-slate-500 font-medium">{quizCopy.correctLabel}</div>
             </div>
             <div className="text-center p-6 bg-slate-50 rounded-2xl">
               <div className="text-3xl font-bold text-slate-800">{stats.flagged}</div>
@@ -253,7 +322,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
             onClick={restartSession}
             className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2"
           >
-            <RotateCcw size={20} /> Restart Board Review
+            <RotateCcw size={20} /> {quizCopy.restart}
           </button>
         </div>
       </div>
@@ -265,11 +334,11 @@ export const QuizView: React.FC<QuizViewProps> = ({
       <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-24 z-30">
         <div className="flex items-center gap-4">
           <div className="bg-indigo-50 p-3 rounded-xl">
-            <Stethoscope className="text-indigo-600" size={24} />
+            {domain === 'GenEd' ? <Sparkles className="text-indigo-600" size={24} /> : <Stethoscope className="text-indigo-600" size={24} />}
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Clinical Vignettes</h2>
-            <p className="text-sm text-slate-500">Board-style practice questions</p>
+            <h2 className="text-xl font-bold text-slate-800">{quizCopy.title}</h2>
+            <p className="text-sm text-slate-500">{quizCopy.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -285,7 +354,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
               className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold hover:bg-indigo-50 transition-all disabled:opacity-50"
             >
               {isExtending ? <Loader2 size={18} className="animate-spin" /> : <PlusCircle size={18} />}
-              Extend Case Study
+              {quizCopy.extendAction}
             </button>
           )}
 
@@ -416,7 +485,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
                       <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200">
                         <Sparkles className="text-indigo-500" size={16} />
-                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Clinical Pearl</span>
+                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{quizCopy.insightLabel}</span>
                       </div>
                     </div>
                   )}
@@ -429,8 +498,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
         {isExtending && (
           <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 flex flex-col items-center justify-center text-center">
             <Loader2 className="text-indigo-500 animate-spin mb-4" size={40} />
-            <p className="text-slate-600 font-semibold mb-2">Generating more clinical cases...</p>
-            <p className="text-slate-400 text-sm mb-4">Creating challenging board-style questions</p>
+            <p className="text-slate-600 font-semibold mb-2">{quizCopy.loadingTitle}</p>
+            <p className="text-slate-400 text-sm mb-4">{quizCopy.loadingSubtitle}</p>
             <div className="w-48 h-2 bg-slate-100 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full animate-progress-indeterminate"></div>
             </div>
@@ -452,7 +521,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
           ) : (
             <>
               <Sparkles size={24} />
-              Request More Cases
+              {quizCopy.requestMore}
             </>
           )}
         </button>
@@ -460,7 +529,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
           onClick={finalizeSession}
           className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
         >
-          Finish Board Review
+          {quizCopy.finish}
         </button>
       </div>
     </div >
