@@ -1,12 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { CheckSession, TopicStatus } from '../types';
+import { CheckSession, TopicStatus, PersonalityProfile } from '../types';
 
 interface Props {
   session: CheckSession;
   elapsedSeconds: number;
   isAiThinking: boolean;
   onSendMessage: (text: string) => void;
+  personality?: PersonalityProfile;
+  personalityActive?: boolean;
 }
 
 const DOT_COLOR: Record<TopicStatus, string> = {
@@ -33,7 +35,7 @@ function wordCount(text: string): number {
   return text.trim() ? text.trim().split(/\s+/).length : 0;
 }
 
-export function SessionView({ session, elapsedSeconds, isAiThinking, onSendMessage }: Props) {
+export function SessionView({ session, elapsedSeconds, isAiThinking, onSendMessage, personality, personalityActive }: Props) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +48,14 @@ export function SessionView({ session, elapsedSeconds, isAiThinking, onSendMessa
 
   const currentTopicId = [...session.messages].reverse().find(m => m.role === 'ai' && m.topicId)?.topicId;
   const currentTopic = session.topics.find(t => t.id === currentTopicId);
+
+  const pct = totalSeconds > 0 ? elapsedSeconds / totalSeconds : 0;
+  const mode = isOvertime ? 'examiner' : pct < 0.25 ? 'friend' : pct < 0.5 ? 'tutor' : pct < 0.75 ? 'instructor' : 'examiner';
+  const MODE_LABEL: Record<string, string> = {
+    friend: personalityActive && personality ? personality.name : 'Friend',
+    tutor: 'Tutor', instructor: 'Instructor', examiner: 'Examiner'
+  };
+  const MODE_COLOR: Record<string, string> = { friend: '#3B6D11', tutor: '#0C447C', instructor: '#6B3F9E', examiner: '#BA7517' };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -139,6 +149,16 @@ export function SessionView({ session, elapsedSeconds, isAiThinking, onSendMessa
               {coveredCount} of {totalCount}
             </span>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+              padding: '3px 8px', borderRadius: 4,
+              color: MODE_COLOR[mode],
+              background: MODE_COLOR[mode] + '22',
+              border: `0.5px solid ${MODE_COLOR[mode]}55`
+            }}>
+              {MODE_LABEL[mode]}
+            </span>
           <div style={{
             fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-mono)',
             color: isOvertime ? 'var(--color-text-danger)' : 'var(--color-text-secondary)',
@@ -148,31 +168,41 @@ export function SessionView({ session, elapsedSeconds, isAiThinking, onSendMessa
           }}>
             {isOvertime ? 'OVERTIME' : formatTime(remainingSeconds)}
           </div>
+          </div>
         </div>
 
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {session.messages.map(msg => {
             const isUser = msg.role === 'user';
+            const showPersonality = !isUser && personalityActive && personality;
+            const aiName = showPersonality ? personality!.name : 'Cross Check';
             return (
               <div key={msg.id} style={{ display: 'flex', gap: 10, flexDirection: isUser ? 'row-reverse' : 'row' }}>
-                <div style={{
-                  width: 27, height: 27, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 500, flexShrink: 0,
-                  border: isUser ? 'none' : '0.5px solid var(--color-border-tertiary)',
-                  background: isUser ? 'var(--color-text-primary)' : 'var(--color-background-secondary)',
-                  color: isUser ? 'var(--color-background-primary)' : 'var(--color-text-primary)'
-                }}>
-                  {isUser ? 'U' : 'CC'}
-                </div>
+                {/* Avatar */}
+                {showPersonality ? (
+                  <div style={{ width: 27, height: 27, borderRadius: '50%', flexShrink: 0, border: '0.5px solid var(--color-border-tertiary)', background: 'var(--color-background-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    {personality!.name.slice(0, 2).toUpperCase()}
+                  </div>
+                ) : (
+                  <div style={{
+                    width: 27, height: 27, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 500, flexShrink: 0,
+                    border: isUser ? 'none' : '0.5px solid var(--color-border-tertiary)',
+                    background: isUser ? 'var(--color-text-primary)' : 'var(--color-background-secondary)',
+                    color: isUser ? 'var(--color-background-primary)' : 'var(--color-text-primary)'
+                  }}>
+                    {isUser ? 'U' : 'CC'}
+                  </div>
+                )}
                 <div style={{ maxWidth: '76%' }}>
                   <div style={{
                     fontSize: 10, color: 'var(--color-text-tertiary)',
                     fontWeight: 500, letterSpacing: '0.04em', marginBottom: 4,
                     textAlign: isUser ? 'right' : 'left'
                   }}>
-                    {isUser ? 'You' : 'Cross Check'}
+                    {isUser ? 'You' : aiName}
                   </div>
                   {!isUser && msg.tag && (
                     <div style={{
@@ -201,16 +231,24 @@ export function SessionView({ session, elapsedSeconds, isAiThinking, onSendMessa
 
           {isAiThinking && (
             <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{
-                width: 27, height: 27, borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 500, flexShrink: 0,
-                border: '0.5px solid var(--color-border-tertiary)',
-                background: 'var(--color-background-secondary)',
-                color: 'var(--color-text-primary)'
-              }}>CC</div>
+              {personalityActive && personality ? (
+                <div style={{ width: 27, height: 27, borderRadius: '50%', flexShrink: 0, border: '0.5px solid var(--color-border-tertiary)', background: 'var(--color-background-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                  {personality.name.slice(0, 2).toUpperCase()}
+                </div>
+              ) : (
+                <div style={{
+                  width: 27, height: 27, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 500, flexShrink: 0,
+                  border: '0.5px solid var(--color-border-tertiary)',
+                  background: 'var(--color-background-secondary)',
+                  color: 'var(--color-text-primary)'
+                }}>CC</div>
+              )}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '0.04em', marginBottom: 4 }}>Cross Check</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '0.04em', marginBottom: 4 }}>
+                  {personalityActive && personality ? personality.name : 'Cross Check'}
+                </div>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 4,
                   padding: '10px 13px',
@@ -261,21 +299,39 @@ export function SessionView({ session, elapsedSeconds, isAiThinking, onSendMessa
               onFocus={e => (e.target.style.borderColor = 'var(--color-border-primary)')}
               onBlur={e => (e.target.style.borderColor = 'var(--color-border-secondary)')}
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isAiThinking}
-              style={{
-                padding: '0 14px', height: 38, borderRadius: 8,
-                background: 'var(--color-text-primary)',
-                color: 'var(--color-background-primary)',
-                fontSize: 12, fontWeight: 500,
-                cursor: input.trim() && !isAiThinking ? 'pointer' : 'not-allowed',
-                opacity: input.trim() && !isAiThinking ? 1 : 0.4,
-                border: 'none', fontFamily: 'var(--font-sans)'
-              }}
-            >
-              Send
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || isAiThinking}
+                style={{
+                  padding: '0 14px', height: 38, borderRadius: 8,
+                  background: 'var(--color-text-primary)',
+                  color: 'var(--color-background-primary)',
+                  fontSize: 12, fontWeight: 500,
+                  cursor: input.trim() && !isAiThinking ? 'pointer' : 'not-allowed',
+                  opacity: input.trim() && !isAiThinking ? 1 : 0.4,
+                  border: 'none', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap'
+                }}
+              >
+                Send
+              </button>
+              <button
+                onClick={() => { setInput(''); onSendMessage("I don't know"); }}
+                disabled={isAiThinking}
+                style={{
+                  padding: '0 14px', height: 26, borderRadius: 6,
+                  background: 'transparent',
+                  color: 'var(--color-text-tertiary)',
+                  fontSize: 11, fontWeight: 500,
+                  cursor: isAiThinking ? 'not-allowed' : 'pointer',
+                  opacity: isAiThinking ? 0.4 : 1,
+                  border: '0.5px solid var(--color-border-tertiary)',
+                  fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap'
+                }}
+              >
+                I don't know
+              </button>
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7 }}>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>

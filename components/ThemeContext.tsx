@@ -45,13 +45,13 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<ThemeColor>(() => {
-    const saved = localStorage.getItem('studygenius-theme');
-    return (saved as ThemeColor) || 'light';
+    const saved = localStorage.getItem('crosscheck-theme');
+    return (saved as ThemeColor) || 'dark';
   });
 
   const setTheme = (newTheme: ThemeColor) => {
     setThemeState(newTheme);
-    localStorage.setItem('studygenius-theme', newTheme);
+    localStorage.setItem('crosscheck-theme', newTheme);
   };
 
   useEffect(() => {

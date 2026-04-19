@@ -9,7 +9,7 @@ interface Props {
   extractedTopics: ExtractedTopic[];
   selectedDuration: SessionDuration;
   onDurationChange: (d: SessionDuration) => void;
-  onFileUpload: (file: File) => void;
+  onFileUpload: (file: File | File[]) => void;
   onBeginSession: () => void;
 }
 
@@ -77,9 +77,13 @@ export function SetupView({ appState, uploadedFile, noteTitle, extractedTopics, 
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4 }}>Drop your notes here or click to browse</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>PDF or text file</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>PDF, images (multi-select), or text file</div>
           </div>
-          <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
+          <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md,image/*" multiple style={{ display: 'none' }} onChange={e => {
+            if (!e.target.files?.length) return;
+            const files = Array.from(e.target.files);
+            onFileUpload(files.length === 1 ? files[0] : files as any);
+          }} />
         </Card>
       </div>
     );
@@ -104,7 +108,7 @@ export function SetupView({ appState, uploadedFile, noteTitle, extractedTopics, 
             borderRadius: 6,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, flexShrink: 0
-          }}>📄</div>
+          }}>{uploadedFile?.type?.startsWith('image/') ? '🖼️' : '📄'}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
               {uploadedFile?.name || noteTitle}
@@ -125,7 +129,11 @@ export function SetupView({ appState, uploadedFile, noteTitle, extractedTopics, 
           >
             Replace
           </button>
-          <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
+          <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md,image/*" multiple style={{ display: 'none' }} onChange={e => {
+            if (!e.target.files?.length) return;
+            const files = Array.from(e.target.files);
+            onFileUpload(files.length === 1 ? files[0] : files as any);
+          }} />
         </div>
       </Card>
 

@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { KnowledgeReport, TopicStatus } from '../types';
 
 interface Props {
   report: KnowledgeReport;
   onNewSession: () => void;
+  onStudyAgain?: () => void;
 }
 
 const DOT_CLS: Record<TopicStatus, string> = {
@@ -31,10 +32,20 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export function ReportView({ report, onNewSession }: Props) {
+export function ReportView({ report, onNewSession, onStudyAgain }: Props) {
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+
   const strong  = report.topics.filter(t => t.status === 'strong').length;
   const weak    = report.topics.filter(t => t.status === 'weak').length;
   const revisit = report.topics.filter(t => t.status === 'revisit').length;
+
+  const toggleTopic = (id: string) => {
+    setExpandedTopics(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div style={{ fontFamily: 'var(--font-sans)' }}>
@@ -74,28 +85,68 @@ export function ReportView({ report, onNewSession }: Props) {
             {report.topics.map(t => {
               const status = t.status as TopicStatus;
               const badge = BADGE[status];
+              const isWeak = status === 'weak' || status === 'revisit';
+              const expanded = expandedTopics.has(t.topicId);
+              const concepts: string[] = (t as any).concepts || [];
+
               return (
                 <div key={t.topicId} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10,
-                  padding: '12px 14px',
                   border: '0.5px solid var(--color-border-tertiary)',
                   borderRadius: 'var(--border-radius-md)',
-                  background: 'var(--color-background-primary)'
+                  background: 'var(--color-background-primary)',
+                  overflow: 'hidden'
                 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4, background: DOT_CLS[status] }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 3 }}>{t.topicName}</div>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{t.evidence}</div>
-                    {t.noteSection && (
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>→ {t.noteSection}</div>
-                    )}
+                  <div
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', cursor: isWeak ? 'pointer' : 'default' }}
+                    onClick={() => isWeak && toggleTopic(t.topicId)}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4, background: DOT_CLS[status] }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 3 }}>{t.topicName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{t.evidence}</div>
+                      {t.noteSection && (
+                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>→ {t.noteSection}</div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
+                        background: badge.bg, color: badge.color
+                      }}>
+                        {badge.label}
+                      </span>
+                      {isWeak && (
+                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                          {expanded ? '▲' : '▼'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span style={{
-                    fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
-                    flexShrink: 0, background: badge.bg, color: badge.color
-                  }}>
-                    {badge.label}
-                  </span>
+
+                  {/* Expandable concepts for weak/revisit */}
+                  {isWeak && expanded && (
+                    <div style={{
+                      borderTop: '0.5px solid var(--color-border-tertiary)',
+                      padding: '12px 14px 14px 32px',
+                      background: 'var(--color-background-secondary)'
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                        Review these concepts
+                      </div>
+                      {concepts.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          {concepts.map((c, i) => (
+                            <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--color-text-secondary)', alignItems: 'flex-start' }}>
+                              <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0, marginTop: 1 }}>·</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No specific concepts recorded for this topic.</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -128,6 +179,21 @@ export function ReportView({ report, onNewSession }: Props) {
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          {onStudyAgain && (
+            <button
+              onClick={onStudyAgain}
+              style={{
+                padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                cursor: 'pointer',
+                background: 'transparent',
+                color: 'var(--color-text-secondary)',
+                border: '0.5px solid var(--color-border-secondary)',
+                fontFamily: 'var(--font-sans)'
+              }}
+            >
+              Study again
+            </button>
+          )}
           <button
             onClick={onNewSession}
             style={{
@@ -139,7 +205,7 @@ export function ReportView({ report, onNewSession }: Props) {
               fontFamily: 'var(--font-sans)'
             }}
           >
-            Run another session →
+            New session →
           </button>
         </div>
       </div>

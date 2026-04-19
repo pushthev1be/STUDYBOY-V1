@@ -79,6 +79,25 @@ export interface SessionTurnResponse {
   overtimeNeeded: boolean;
 }
 
+export interface PersonalityStyle {
+  rawDescription: string;
+  phrases: string[];
+  emojiUsage: 'none' | 'rare' | 'moderate' | 'frequent';
+  humor: string;
+  encouragement: string;
+  corrections: string;
+}
+
+export interface PersonalityProfile {
+  id: string;
+  name: string;
+  pfpDataUrl: string;
+  pin: string;
+  authorizedEmail: string;
+  style: PersonalityStyle;
+  createdAt: string;
+}
+
 export enum AppState {
   AUTH = 'AUTH',
   IDLE = 'IDLE',

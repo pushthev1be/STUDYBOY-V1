@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, CSSProperties } from 'react';
 import { CheckSquare, Mail, Lock, User as UserIcon, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { User } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -11,57 +11,16 @@ interface AuthViewProps {
 export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: ''
-  });
-
+  const [formData, setFormData] = useState({ username: '', email: '', password: '' });
   const [errorMsg, setErrorMsg] = useState('');
-  const [showResendOption, setShowResendOption] = useState(false);
-
-  const handleResendConfirmation = async () => {
-    if (!formData.email) {
-      setErrorMsg('Please enter your email address.');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.resendEnrollmentEmail(formData.email);
-      if (error) {
-        setErrorMsg('Failed to resend email: ' + error.message);
-      } else {
-        setErrorMsg('Confirmation email sent! Check your inbox and spam folder.');
-        setShowResendOption(false);
-      }
-    } catch (err: any) {
-      setErrorMsg('Error resending email: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    // Check for existing session on mount
-    const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.user) {
-          // Session exists, restore user
-          onAuth({
-            id: data.session.user.id,
-            username: data.session.user.user_metadata?.username || data.session.user.email?.split('@')[0] || 'User',
-            email: data.session.user.email || '',
-            joinedAt: data.session.user.created_at || new Date().toISOString()
-          } as any);
-        }
-      } catch (err) {
-        console.error('Session check error:', err);
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        const u = data.session.user;
+        onAuth({ id: u.id, username: u.user_metadata?.username || u.email?.split('@')[0] || 'User', email: u.email || '', joinedAt: u.created_at || new Date().toISOString() } as any);
       }
-    };
-    
-    checkSession();
+    });
   }, [onAuth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,182 +30,118 @@ export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
 
     try {
       if (isLogin) {
-        console.log('Attempting login with email:', formData.email);
         const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
-
         if (error) {
-          console.error('Login error:', error);
-          if (error.message.includes('Invalid login credentials')) {
-            setErrorMsg('Invalid email or password. Email confirmation may also be required.');
-            setShowResendOption(true);
-          } else if (error.message.includes('Email not confirmed')) {
-            setErrorMsg('Please confirm your email before logging in.');
-            setShowResendOption(true);
-          } else {
-            setErrorMsg(error.message || 'Login failed. Please try again.');
-            setShowResendOption(false);
-          }
+          setErrorMsg(error.message.includes('Invalid login credentials') ? 'Wrong email or password.' : error.message);
           return;
         }
-
         if (data.user) {
-          console.log('Login successful for user:', data.user.id);
-          onAuth({
-            id: data.user.id,
-            username: data.user.user_metadata?.username || formData.email.split('@')[0],
-            email: data.user.email || formData.email,
-            joinedAt: data.user.created_at || new Date().toISOString()
-          } as any);
+          onAuth({ id: data.user.id, username: data.user.user_metadata?.username || formData.email.split('@')[0], email: data.user.email || formData.email, joinedAt: data.user.created_at || new Date().toISOString() } as any);
         }
       } else {
-        // Validate password strength
-        if (formData.password.length < 6) {
-          setErrorMsg('Password must be at least 6 characters long.');
-          return;
-        }
-
-        console.log('Attempting signup with email:', formData.email);
+        if (formData.password.length < 6) { setErrorMsg('Password must be at least 6 characters.'); return; }
         const { data, error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
-          options: {
-            data: {
-              username: formData.username
-            }
-          }
+          options: { data: { username: formData.username } }
         });
-
         if (error) {
-          console.error('Signup error:', error);
-          // Check for specific error messages from Supabase
           if (error.message.includes('already registered') || error.message.includes('User already exists')) {
-            setErrorMsg('This email already has an account. Please log in instead.');
+            setErrorMsg('An account with this email already exists.');
           } else if (error.message.includes('rate limit') || error.message.includes('429')) {
-            setErrorMsg('Too many signup attempts. Please try again in a few minutes.');
-          } else if (error.message.includes('invalid email')) {
-            setErrorMsg('Please enter a valid email address.');
+            setErrorMsg('Too many attempts. Try again in a few minutes.');
           } else {
-            setErrorMsg(error.message || 'Signup failed. Please try again.');
+            setErrorMsg(error.message);
           }
-        } else if (data.session || data.user) {
-          // If email confirmation is required, the user might not be immediately logged in.
-          // But for simplicity, we pass them right through if a session exists
-          console.log('Signup successful for user:', data.user?.id);
-          onAuth({
-            id: data.user?.id || crypto.randomUUID(),
-            username: formData.username || formData.email.split('@')[0],
-            email: formData.email,
-            joinedAt: data.user?.created_at || new Date().toISOString()
-          } as any);
-        } else {
-          setErrorMsg('Account created! Check your email for the confirmation link.');
+          return;
+        }
+        if (data.user) {
+          onAuth({ id: data.user.id, username: formData.username || formData.email.split('@')[0], email: formData.email, joinedAt: data.user.created_at || new Date().toISOString() } as any);
         }
       }
     } catch (err: any) {
-      console.error('Auth error:', err);
-      setErrorMsg(err.message || 'Authentication failed. Please try again.');
+      setErrorMsg(err.message || 'Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const inputStyle: CSSProperties = {
+    width: '100%', padding: '12px 12px 12px 44px',
+    background: 'var(--color-background-secondary)',
+    border: '0.5px solid var(--color-border-secondary)',
+    borderRadius: 10, outline: 'none',
+    fontSize: 14, color: 'var(--color-text-primary)',
+    fontFamily: 'var(--font-sans)'
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-theme-primary via-theme-secondary to-theme-tertiary">
-      <div className="max-w-md w-full animate-fade-in">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center bg-theme-accent p-4 rounded-[2rem] shadow-2xl shadow-theme-accent mb-6">
-            <CheckSquare size={48} className="text-white" />
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'var(--color-background-primary)', fontFamily: 'var(--font-sans)' }}>
+      <div style={{ maxWidth: 400, width: '100%' }}>
+
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 12, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', marginBottom: 16 }}>
+            <CheckSquare size={24} style={{ color: 'var(--color-text-primary)' }} />
           </div>
-          <h1 className="text-4xl font-extrabold text-theme-primary mb-2">CrossCheck</h1>
-          <p className="text-theme-muted font-medium">Find out what you actually know</p>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 6 }}>CrossCheck</div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>Find out what you actually know</div>
         </div>
 
-        <div className="bg-theme-card p-10 rounded-[2.5rem] shadow-xl border border-theme-primary">
-          <h2 className="text-2xl font-bold text-theme-primary mb-8">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+        <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 16, padding: '28px 28px 24px' }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 20 }}>
+            {isLogin ? 'Sign in' : 'Create account'}
+          </div>
 
           {errorMsg && (
-            <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-sm flex flex-col gap-3 animate-fade-in">
-              <div className="flex items-start gap-3">
-                <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-              {showResendOption && isLogin && (
-                <button
-                  type="button"
-                  onClick={handleResendConfirmation}
-                  disabled={loading}
-                  className="mt-2 px-4 py-2 bg-rose-500 text-white rounded-lg text-xs font-bold hover:bg-rose-600 transition-colors disabled:opacity-50"
-                >
-                  {loading ? <Loader2 size={14} className="inline animate-spin" /> : 'Resend Confirmation Email'}
-                </button>
-              )}
+            <div style={{ marginBottom: 16, padding: '10px 12px', background: '#1a0a0a', border: '0.5px solid #3f1212', borderRadius: 8, fontSize: 12, color: '#f87171', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <AlertCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>{errorMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {!isLogin && (
-              <div className="relative">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-tertiary" size={20} />
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  required
-                  className="w-full pl-12 pr-4 py-4 bg-theme-hover border border-theme-secondary rounded-2xl focus:ring-2 focus:ring-theme-accent focus:border-theme-accent outline-none transition-all text-theme-primary font-medium"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                />
+              <div style={{ position: 'relative' }}>
+                <UserIcon size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+                <input type="text" placeholder="Full name" required style={inputStyle}
+                  value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })}
+                  onFocus={e => (e.target.style.borderColor = 'var(--color-border-primary)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--color-border-secondary)')} />
               </div>
             )}
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-tertiary" size={20} />
-              <input
-                type="email"
-                placeholder="Email Address"
-                required
-                className="w-full pl-12 pr-4 py-4 bg-theme-hover border border-theme-secondary rounded-2xl focus:ring-2 focus:ring-theme-accent focus:border-theme-accent outline-none transition-all text-theme-primary font-medium"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
+            <div style={{ position: 'relative' }}>
+              <Mail size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+              <input type="email" placeholder="Email address" required style={inputStyle}
+                value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
+                onFocus={e => (e.target.style.borderColor = 'var(--color-border-primary)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--color-border-secondary)')} />
             </div>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-tertiary" size={20} />
-              <input
-                type="password"
-                placeholder="Password"
-                required
-                className="w-full pl-12 pr-4 py-4 bg-theme-hover border border-theme-secondary rounded-2xl focus:ring-2 focus:ring-theme-accent focus:border-theme-accent outline-none transition-all text-theme-primary font-medium"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
+            <div style={{ position: 'relative' }}>
+              <Lock size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+              <input type="password" placeholder="Password" required style={inputStyle}
+                value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
+                onFocus={e => (e.target.style.borderColor = 'var(--color-border-primary)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--color-border-secondary)')} />
             </div>
 
-            <button
-              disabled={loading}
-              className="w-full py-4 bg-theme-accent text-white rounded-2xl font-bold text-lg hover:bg-theme-accent-secondary transition-all flex items-center justify-center gap-2 shadow-lg shadow-theme-accent disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 size={24} className="animate-spin" />
-              ) : (
-                <>
-                  {isLogin ? 'Login' : 'Create Account'} <ArrowRight size={20} />
-                </>
-              )}
+            <button disabled={loading} style={{ marginTop: 4, padding: '11px 0', background: 'var(--color-text-primary)', color: 'var(--color-background-primary)', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'var(--font-sans)' }}>
+              {loading ? <Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }} /> : <>{isLogin ? 'Sign in' : 'Create account'} <ArrowRight size={15} /></>}
             </button>
           </form>
 
-          <div className="mt-8 pt-8 border-t border-theme-primary text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-theme-muted font-semibold hover:text-theme-accent transition-colors"
-            >
-              {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login"}
+          <div style={{ marginTop: 20, paddingTop: 20, borderTop: '0.5px solid var(--color-border-tertiary)', textAlign: 'center' }}>
+            <button onClick={() => { setIsLogin(!isLogin); setErrorMsg(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-sans)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}>
+              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
             </button>
           </div>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AppState, User, CheckSession, SessionDuration, QAMessage, ExtractedTopic, TopicPerformance, SessionTurnResponse, KnowledgeReport } from './types';
-import { extractTopicsFromNotes, runSessionTurn, generateKnowledgeReport } from './services/geminiService';
+import { AppState, User, CheckSession, SessionDuration, QAMessage, ExtractedTopic, TopicPerformance, SessionTurnResponse, KnowledgeReport, PersonalityProfile } from './types';
+import { extractTopicsFromNotes, runSessionTurn, generateKnowledgeReport, extractTextFromImage } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { AuthView } from './components/AuthView';
 import { BrandMark } from './components/BrandMark';
@@ -9,6 +9,7 @@ import { HomeView } from './components/HomeView';
 import { SetupView } from './components/SetupView';
 import { SessionView } from './components/SessionView';
 import { ReportView } from './components/ReportView';
+import { PersonalitySetup } from './components/PersonalitySetup';
 import { ThemeProvider } from './components/ThemeContext';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -82,12 +83,36 @@ export default function App() {
   const [pastReports, setPastReports] = useState<KnowledgeReport[]>(loadPastReports);
   const [viewingReport, setViewingReport] = useState<KnowledgeReport | null>(null);
 
-  // Error
+  // Personality
+  const [personality, setPersonality] = useState<PersonalityProfile | null>(() => {
+    try { const r = localStorage.getItem('crosscheck-personality'); return r ? JSON.parse(r) : null; } catch { return null; }
+  });
+  const [personalityActive, setPersonalityActive] = useState(false);
+  const [showPersonalitySetup, setShowPersonalitySetup] = useState(false);
+  const [showPinEntry, setShowPinEntry] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [showPersonalityPopover, setShowPersonalityPopover] = useState(false);
+
+  // Error log
+  const [errorLog, setErrorLog] = useState<{ id: string; time: string; context: string; message: string }[]>([]);
+  const [showErrorLog, setShowErrorLog] = useState(false);
   const [error, setError] = useState('');
+
+  const logError = (context: string, err: any) => {
+    const entry = {
+      id: generateId(),
+      time: new Date().toLocaleTimeString(),
+      context,
+      message: err?.message || String(err)
+    };
+    setErrorLog(prev => [entry, ...prev.slice(0, 49)]);
+    console.error(`[${context}]`, err);
+  };
 
   // Auth check
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: sb } }) => {
+    supabase.auth.getSession().then(({ data }: { data: any }) => { const sb = data.session;
       if (sb?.user) {
         setUser({ id: sb.user.id, username: sb.user.user_metadata?.username || sb.user.email?.split('@')[0] || 'User', email: sb.user.email || '', joinedAt: sb.user.created_at || '' });
         setAppState(AppState.IDLE);
@@ -141,19 +166,31 @@ export default function App() {
       setNoteContent(content); setNoteTitle(title); setExtractedTopics(topics);
       setAppState(AppState.SESSION_SETUP);
     } catch (e: any) {
+      logError('processNotes', e);
       setError(e?.message || 'Failed to process notes.');
       setAppState(AppState.IDLE); setActiveScreen('home');
     }
   };
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = async (files: File | File[]) => {
+    const fileList = Array.isArray(files) ? files : [files];
+    const primary = fileList[0];
     setAppState(AppState.UPLOADING);
     setActiveScreen('setup');
     try {
-      const content = file.type === 'application/pdf' ? await extractTextFromPdf(file) : await file.text();
+      let content: string;
+      const images = fileList.filter(f => f.type.startsWith('image/'));
+      if (images.length > 0) {
+        content = await extractTextFromImage(images.length === 1 ? images[0] : images);
+      } else if (primary.type === 'application/pdf') {
+        content = await extractTextFromPdf(primary);
+      } else {
+        content = await primary.text();
+      }
       if (!content.trim()) throw new Error('No readable text found in file.');
-      await processNotes(content, file);
+      await processNotes(content, primary);
     } catch (e: any) {
+      logError('fileUpload', e);
       setError(e?.message || 'Failed to read file.');
       setUploadedFile(null); setAppState(AppState.IDLE); setActiveScreen('home');
     }
@@ -171,10 +208,11 @@ export default function App() {
     setIsAiThinking(true); setAppState(AppState.SESSION_ACTIVE); setActiveScreen('session');
 
     try {
-      const turn = await runSessionTurn(newSession, null, 0, true);
+      const turn = await runSessionTurn(newSession, null, 0, true, personalityActive ? personality ?? undefined : undefined);
       const aiMsg: QAMessage = { id: generateId(), role: 'ai', content: turn.message, topicId: turn.currentTopicId, tag: 'question', timestamp: Date.now() };
       setSession(prev => prev ? { ...prev, messages: [aiMsg] } : prev);
-    } catch {
+    } catch (e) {
+      logError('startSession', e);
       setSession(prev => prev ? { ...prev, messages: [{ id: generateId(), role: 'ai', content: 'The audit is beginning. Walk me through the main topics covered in your notes.', timestamp: Date.now() }] } : prev);
     } finally { setIsAiThinking(false); }
   }, [extractedTopics, noteTitle, noteContent, selectedDuration]);
@@ -186,7 +224,7 @@ export default function App() {
     setSession(updated); setIsAiThinking(true);
 
     try {
-      const turn: SessionTurnResponse = await runSessionTurn(updated, text, elapsedSeconds, false);
+      const turn: SessionTurnResponse = await runSessionTurn(updated, text, elapsedSeconds, false, personalityActive ? personality ?? undefined : undefined);
       const aiMsg: QAMessage = { id: generateId(), role: 'ai', content: turn.message, topicId: turn.currentTopicId, tag: turn.isFollowUp ? 'followup' : 'question', timestamp: Date.now() };
 
       const newPerfs = { ...updated.topicPerformances };
@@ -198,8 +236,9 @@ export default function App() {
       const next: CheckSession = { ...updated, messages: [...updated.messages, aiMsg], topicPerformances: newPerfs };
       setSession(next);
       if (turn.sessionShouldEnd && !turn.overtimeNeeded) setTimeout(() => handleEndSession(next), 800);
-    } catch {
-      setSession(prev => prev ? { ...prev, messages: [...prev.messages, { id: generateId(), role: 'ai', content: 'Connection issue. Please continue with your answer.', timestamp: Date.now() }] } : prev);
+    } catch (e) {
+      logError('sendMessage', e);
+      setSession(prev => prev ? { ...prev, messages: [...prev.messages, { id: generateId(), role: 'ai', content: 'Connection issue. Please try again.', timestamp: Date.now() }] } : prev);
     } finally { setIsAiThinking(false); }
   }, [session, isAiThinking, elapsedSeconds]);
 
@@ -216,7 +255,8 @@ export default function App() {
       setViewingReport(report);
       const updated = [...pastReports, report];
       setPastReports(updated); savePastReports(updated);
-    } catch {
+    } catch (e) {
+      logError('endSession/generateReport', e);
       const topics = final.topics.map(t => final.topicPerformances[t.id] || { topicId: t.id, topicName: t.name, status: 'untested' as const, evidence: 'Not covered.', concepts: t.concepts });
       const report: KnowledgeReport = { sessionId: final.id, date: new Date().toISOString(), uploadTitle: final.uploadTitle, durationMinutes: final.duration, actualDurationMinutes: Math.round((Date.now() - final.startTime) / 60000), topics, revisitList: topics.filter(t => t.status === 'weak' || t.status === 'revisit').flatMap(t => t.concepts.slice(0, 2).map(c => ({ concept: c, topicName: t.topicName }))), overtimeUsed: final.isOvertimeActive };
       setViewingReport(report);
@@ -234,6 +274,18 @@ export default function App() {
     setViewingReport(null); setAppState(AppState.IDLE); setActiveScreen('setup');
   };
 
+  const handleStudyAgain = () => {
+    // If we still have the notes from the last session, go straight to setup with them loaded
+    // Otherwise navigate to setup for a fresh upload
+    setSession(null); setElapsedSeconds(0); overtimeTriggeredRef.current = false;
+    setViewingReport(null);
+    if (noteContent && extractedTopics.length > 0) {
+      setAppState(AppState.SESSION_SETUP); setActiveScreen('setup');
+    } else {
+      setAppState(AppState.IDLE); setActiveScreen('setup');
+    }
+  };
+
   const handleViewReport = (report: KnowledgeReport) => {
     setViewingReport(report); setActiveScreen('report');
   };
@@ -242,6 +294,12 @@ export default function App() {
     if (screen === 'session' && appState !== AppState.SESSION_ACTIVE) return;
     if (screen === 'report' && !viewingReport && appState !== AppState.REPORT) return;
     setActiveScreen(screen);
+  };
+
+  const handleSavePersonality = (profile: PersonalityProfile) => {
+    setPersonality(profile);
+    localStorage.setItem('crosscheck-personality', JSON.stringify(profile));
+    setShowPersonalitySetup(false);
   };
 
   // AUTH
@@ -255,6 +313,10 @@ export default function App() {
     <ThemeProvider>
       <div style={{ display: 'flex', height: '100vh', background: 'var(--color-background-primary)', fontFamily: 'var(--font-sans)', overflow: 'hidden' }}>
 
+        {showPersonalitySetup && (
+          <PersonalitySetup onSave={handleSavePersonality} onClose={() => setShowPersonalitySetup(false)} />
+        )}
+
         {/* Nav */}
         <nav style={{ width: 200, borderRight: '0.5px solid var(--color-border-tertiary)', display: 'flex', flexDirection: 'column', background: 'var(--color-background-secondary)', flexShrink: 0 }}>
           <div style={{ padding: '18px 16px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
@@ -263,6 +325,130 @@ export default function App() {
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 5 }}>Knowledge audit</div>
           </div>
+
+          {/* Personality icon */}
+          {personality && (
+            <div style={{ padding: '10px 16px 0', position: 'relative' }}>
+              <div
+                onClick={() => {
+                  if (personalityActive) {
+                    setPersonalityActive(false);
+                    setShowPersonalityPopover(false);
+                  } else {
+                    const emailMatch = true; // TODO: restore email gate — const emailMatch = user?.email?.toLowerCase() === personality.authorizedEmail.toLowerCase();
+                    if (!emailMatch) {
+                      setPinError('not-authorized');
+                      setShowPersonalityPopover(true);
+                    } else {
+                      setPinError('');
+                      setPinInput('');
+                      setShowPersonalityPopover(p => !p);
+                    }
+                  }
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 9,
+                  padding: '7px 8px', borderRadius: 8, cursor: 'pointer',
+                  background: personalityActive ? 'var(--color-background-primary)' : 'transparent',
+                  border: personalityActive ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    {personality.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{
+                    position: 'absolute', bottom: -1, right: -1,
+                    width: 9, height: 9, borderRadius: '50%',
+                    background: personalityActive ? '#3B6D11' : 'var(--color-border-secondary)',
+                    border: '1.5px solid var(--color-background-secondary)'
+                  }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1.2 }}>{personality.name}</div>
+                  <div style={{ fontSize: 10, color: personalityActive ? '#3B6D11' : 'var(--color-text-tertiary)' }}>
+                    {personalityActive ? 'Active' : 'Off'}
+                  </div>
+                </div>
+              </div>
+
+              {/* PIN / blocked popover */}
+              {showPersonalityPopover && !personalityActive && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 16, right: 16, zIndex: 100,
+                  background: 'var(--color-background-primary)',
+                  border: '0.5px solid var(--color-border-secondary)',
+                  borderRadius: 10, padding: '12px 12px 10px', marginTop: 4,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+                }}>
+                  {pinError === 'not-authorized' ? (
+                    <>
+                      <div style={{ fontSize: 12, color: '#f87171', marginBottom: 8, lineHeight: 1.4 }}>
+                        This personality is locked to a specific account.
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => { setShowPersonalityPopover(false); setPinError(''); }} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: 'none', border: '0.5px solid var(--color-border-secondary)', borderRadius: 5, cursor: 'pointer', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-sans)' }}>Close</button>
+                        <button onClick={() => { setPersonality(null); localStorage.removeItem('crosscheck-personality'); setShowPersonalityPopover(false); setPersonalityActive(false); setPinError(''); }} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: 'none', border: '0.5px solid #3f1212', borderRadius: 5, cursor: 'pointer', color: '#f87171', fontFamily: 'var(--font-sans)' }}>Delete</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>Enter PIN to enable</div>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="PIN"
+                        value={pinInput}
+                        onChange={e => { setPinInput(e.target.value.replace(/\D/g, '')); setPinError(''); }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            if (pinInput === personality.pin) { setPersonalityActive(true); setShowPersonalityPopover(false); setPinInput(''); }
+                            else { setPinError('Wrong PIN'); }
+                          }
+                        }}
+                        autoFocus
+                        style={{
+                          width: '100%', padding: '8px 10px', fontSize: 13,
+                          background: 'var(--color-background-secondary)',
+                          border: `0.5px solid ${pinError ? '#f87171' : 'var(--color-border-secondary)'}`,
+                          borderRadius: 6, outline: 'none', color: 'var(--color-text-primary)',
+                          fontFamily: 'var(--font-sans)', letterSpacing: '0.15em'
+                        }}
+                      />
+                      {pinError && <div style={{ fontSize: 11, color: '#f87171', marginTop: 5 }}>{pinError}</div>}
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                        <button onClick={() => { setShowPersonalityPopover(false); setPinInput(''); setPinError(''); }} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: 'none', border: '0.5px solid var(--color-border-secondary)', borderRadius: 5, cursor: 'pointer', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-sans)' }}>Cancel</button>
+                        <button onClick={() => {
+                          if (pinInput === personality.pin) { setPersonalityActive(true); setShowPersonalityPopover(false); setPinInput(''); }
+                          else { setPinError('Wrong PIN'); }
+                        }} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: 'var(--color-text-primary)', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--color-background-primary)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>Unlock</button>
+                      </div>
+                      <button onClick={() => { setPersonality(null); localStorage.removeItem('crosscheck-personality'); setShowPersonalityPopover(false); setPersonalityActive(false); }} style={{ marginTop: 8, width: '100%', padding: '5px 0', fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-sans)' }}>
+                        Delete personality
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!personality && (
+            <div style={{ padding: '10px 16px 0' }}>
+              <button
+                onClick={() => setShowPersonalitySetup(true)}
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 11,
+                  background: 'none', border: '0.5px dashed var(--color-border-secondary)',
+                  color: 'var(--color-text-tertiary)', cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                }}
+              >
+                <span style={{ fontSize: 14 }}>+</span> Create personality
+              </button>
+            </div>
+          )}
 
           <div style={{ padding: '16px 10px 6px' }}>
             <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0 6px', marginBottom: 6 }}>Menu</div>
@@ -298,15 +484,57 @@ export default function App() {
             })}
           </div>
 
-          <div style={{ marginTop: 'auto', padding: '12px 10px', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6, cursor: 'pointer' }} onClick={handleLogout}>
-              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500, color: 'var(--color-text-primary)', flexShrink: 0 }}>
-                {user?.username?.[0]?.toUpperCase() || 'U'}
+          <div style={{ marginTop: 'auto', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
+            {/* Error log button */}
+            {errorLog.length > 0 && (
+              <div style={{ padding: '8px 10px 0' }}>
+                <button onClick={() => setShowErrorLog(true)} style={{
+                  width: '100%', padding: '6px 10px', borderRadius: 6, fontSize: 11,
+                  background: '#1a0a0a', border: '0.5px solid #3f1212',
+                  color: '#f87171', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                }}>
+                  <span>Errors</span>
+                  <span style={{ background: '#3f1212', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 600 }}>{errorLog.length}</span>
+                </button>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{user?.username || 'User'}</div>
+            )}
+            <div style={{ padding: '8px 10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6, cursor: 'pointer' }} onClick={handleLogout}>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500, color: 'var(--color-text-primary)', flexShrink: 0 }}>
+                  {user?.username?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{user?.username || 'User'}</div>
+              </div>
             </div>
           </div>
         </nav>
+
+        {/* Error log overlay */}
+        {showErrorLog && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-start', padding: 16 }} onClick={() => setShowErrorLog(false)}>
+            <div style={{ width: 420, maxHeight: '70vh', background: '#0f0a0a', border: '0.5px solid #3f1212', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '0.5px solid #3f1212' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#f87171', fontFamily: 'var(--font-sans)' }}>Error log ({errorLog.length})</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setErrorLog([])} style={{ fontSize: 11, background: 'none', border: 'none', color: '#636366', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>Clear</button>
+                  <button onClick={() => setShowErrorLog(false)} style={{ fontSize: 11, background: 'none', border: 'none', color: '#636366', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>Close</button>
+                </div>
+              </div>
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {errorLog.map(e => (
+                  <div key={e.id} style={{ padding: '10px 16px', borderBottom: '0.5px solid #1a0a0a' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: '#636366', fontFamily: 'var(--font-mono)' }}>{e.time}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: '#BA7517', background: '#1a1000', padding: '1px 6px', borderRadius: 3, fontFamily: 'var(--font-mono)' }}>{e.context}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#f87171', fontFamily: 'var(--font-mono)', lineHeight: 1.5, wordBreak: 'break-word' }}>{e.message}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -385,12 +613,14 @@ export default function App() {
                     elapsedSeconds={elapsedSeconds}
                     isAiThinking={isAiThinking}
                     onSendMessage={handleSendMessage}
+                    personality={personality ?? undefined}
+                    personalityActive={personalityActive}
                   />
                 )}
               </div>
             )}
             {activeScreen === 'report' && displayReport && (
-              <ReportView report={displayReport} onNewSession={handleNewSession} />
+              <ReportView report={displayReport} onNewSession={handleNewSession} onStudyAgain={handleStudyAgain} />
             )}
             {activeScreen === 'report' && !displayReport && (
               <div style={{ padding: 24, fontSize: 13, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-sans)' }}>No report available yet.</div>

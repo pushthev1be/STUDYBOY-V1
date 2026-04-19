@@ -4,7 +4,7 @@ import { KnowledgeReport } from '../types';
 
 interface Props {
   pastReports: KnowledgeReport[];
-  onFileUpload: (file: File) => void;
+  onFileUpload: (file: File | File[]) => void;
   onViewReport: (report: KnowledgeReport) => void;
   onStartNewSession: () => void;
 }
@@ -105,9 +105,13 @@ export function HomeView({ pastReports, onFileUpload, onViewReport, onStartNewSe
             </svg>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4 }}>Upload your notes to begin</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>PDF or text file · Max 50MB</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>PDF, images (multi-select), or text file</div>
         </div>
-        <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
+        <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md,image/*" multiple style={{ display: 'none' }} onChange={e => {
+          if (!e.target.files?.length) return;
+          const files = Array.from(e.target.files);
+          onFileUpload(files.length === 1 ? files[0] : files as any);
+        }} />
 
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
