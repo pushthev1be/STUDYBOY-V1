@@ -175,6 +175,26 @@
   --gradient-card: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
 }
 
+/* ===== CROSSCHECK CSS VAR ALIASES ===== */
+/* Maps the mockup's --color-* naming to the app's theme vars */
+:root, .theme-light, .theme-dark, .theme-pink, .theme-ocean, .theme-emerald {
+  --color-background-primary: var(--bg-primary);
+  --color-background-secondary: var(--bg-secondary);
+  --color-background-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border-primary: var(--accent-primary);
+  --color-border-secondary: var(--border-secondary);
+  --color-border-tertiary: var(--border-primary);
+  --color-text-danger: #ef4444;
+  --color-border-danger: #fca5a5;
+  --border-radius-lg: 12px;
+  --border-radius-md: 8px;
+  --font-sans: 'Manrope', 'Inter', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', monospace;
+}
+
 /* ===== BASE STYLES ===== */
 
 html,

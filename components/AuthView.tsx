@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Mail, Lock, User as UserIcon, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { CheckSquare, Mail, Lock, User as UserIcon, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { User } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -158,10 +158,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onAuth }) => {
       <div className="max-w-md w-full animate-fade-in">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center bg-theme-accent p-4 rounded-[2rem] shadow-2xl shadow-theme-accent mb-6">
-            <BrainCircuit size={48} className="text-white" />
+            <CheckSquare size={48} className="text-white" />
           </div>
-          <h1 className="text-4xl font-extrabold text-theme-primary mb-2">StudyGenius AI</h1>
-          <p className="text-theme-muted font-medium">Your personal AI learning companion</p>
+          <h1 className="text-4xl font-extrabold text-theme-primary mb-2">CrossCheck</h1>
+          <p className="text-theme-muted font-medium">Find out what you actually know</p>
         </div>
 
         <div className="bg-theme-card p-10 rounded-[2.5rem] shadow-xl border border-theme-primary">
